@@ -9,7 +9,7 @@ One self-contained deck per course week, sharing the `seriph` theme.
 
 ```bash
 npm install        # once
-npm run dev        # opens the active week in the browser with live reload
+npm run dev        # opens the full course deck in the browser with live reload
 ```
 
 ## Project structure
@@ -18,30 +18,34 @@ The Slidev project lives in the **repository root**.
 
 ```
 RTOS/
-├─ slides.md          Entry deck — holds deck config (theme, fonts) + `src:`
+├─ slides.md          Master deck — cover + contents, imports every weekNN.md
 ├─ week01.md          Week 1 — Foundations of Real-Time Systems   (complete)
-├─ week02.md … week16.md   (to be added — see course map below)
+├─ week02.md          Week 2 — Task Model & the Utilization Bound (complete)
+├─ week03.md          Week 3 — Rate Monotonic Scheduling          (complete)
+├─ week04.md          Week 4 — Earliest Deadline First & RMS vs. EDF (complete)
+├─ week05.md … week16.md   (to be added — see course map below)
 ├─ figures/           TikZ figure sources (.tex) + compiled .svg + build.sh
 ├─ global-bottom.vue  Global component — page numbers on every slide
 ├─ package.json
 └─ rtos_syllabus.tex / .pdf, ref_books/   (course source material)
 ```
 
-**`slides.md` is the entry point.** Slidev reads deck-level config (theme,
+**`slides.md` is the master deck.** Slidev reads deck-level config (theme,
 fonts, transition) **only** from the entry file, so `slides.md` carries that
-config and then pulls in a week with `src: ./weekNN.md`. To present a different
-week, change the one `src:` line in `slides.md`.
+config, then a **cover** and a **Course Contents** slide, and finally imports
+every week — one `src: ./weekNN.md` block per week, in order.
 
-Each `weekNN.md` also keeps its own headmatter, so it can be run standalone too:
+Each `weekNN.md` also keeps its own headmatter, so any week can be built or
+presented on its own:
 
 ```bash
-npm run slide -- week02.md          # run a week deck directly
+npm run slide -- week02.md          # run a single week deck directly
 ```
 
 ## Building & exporting
 
 ```bash
-npm run build                       # static site -> dist/  (from slides.md)
+npm run build                       # whole course -> dist/  (from slides.md)
 npm run export                      # PDF export (needs playwright-chromium)
 npm i -D playwright-chromium        # one-time, for PDF export
 ```
@@ -75,7 +79,7 @@ While presenting: `f` fullscreen · `o` slide overview · `d` dark mode ·
 - **Theme** — `seriph`, with KMUTNB blue (`#003874`) as the primary accent.
 - **Math** — KaTeX, `$...$` inline and `$$...$$` block.
 - **Diagrams** — authored as **TikZ** in `figures/*.tex`, compiled to SVG with
-  `figures/build.sh` (needs a LaTeX toolchain: `pdflatex` + `dvisvgm`).
+  `figures/build.sh` (needs a LaTeX toolchain: `latex` + `dvisvgm`).
 - **Code** — Shiki highlighting; line-by-line reveals via ```c {1|2-3|all}```.
 - **Builds** — incremental reveals use `<v-clicks>` / `v-click`.
 - **Image files** — keep them in `figures/` and reference them with a
@@ -90,4 +94,6 @@ cd figures && ./build.sh        # recompiles every *.tex to *.svg
 ```
 
 To start a new week, copy `week01.md` as a template — keep the headmatter and
-the `<style>` block at the end so branding stays consistent.
+the `<style>` block at the end so branding stays consistent. Then register it
+in `slides.md`: add a row to the **Course Contents** slide and a matching
+`src: ./weekNN.md` block at the end of the file.

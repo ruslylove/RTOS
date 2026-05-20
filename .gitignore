@@ -8,4 +8,5 @@ dist/
 figures/*.aux
 figures/*.log
 figures/*.pdf
+figures/*.dvi
 figures/*.synctex.gz
