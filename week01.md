@@ -1,5 +1,6 @@
 ---
 theme: seriph
+background: https://cover.sli.dev
 title: "RTOS · Week 1 — Foundations of Real-Time Systems"
 info: |
   ## Real-Time Operating Systems
@@ -232,6 +233,7 @@ The common thread: a computer coupled to a <b>physical process</b> that will not
 
 A real-time system is a computer **coupled to physics**. Physics sets the clock.
 
+<img src="./figures/control_loop.svg" class="w-90 max-w-3xl mx-auto"/>
 
 <div class="mt-6 grid grid-cols-2 gap-6 text-sm">
 
@@ -263,42 +265,7 @@ layout: section
 A **task** (τ) is recurring work; each instance is a **job**.
 
 <div class="my-4 flex justify-center">
-<svg viewBox="0 0 720 230" class="w-full max-w-3xl">
-  <!-- timeline axis -->
-  <line x1="50" y1="155" x2="700" y2="155" stroke="#888" stroke-width="2"/>
-  <polygon points="700,155 689,150 689,160" fill="#888"/>
-  <text x="694" y="178" font-size="13" fill="#888">t</text>
-
-  <!-- execution block -->
-  <rect x="190" y="115" width="232" height="40" fill="#003874" rx="3"/>
-  <text x="306" y="140" font-size="13" fill="#fff" text-anchor="middle">execution — Cᵢ</text>
-
-  <!-- release arrow (up) -->
-  <line x1="118" y1="200" x2="118" y2="157" stroke="#1f9d55" stroke-width="2.5"/>
-  <polygon points="118,151 112,164 124,164" fill="#1f9d55"/>
-  <text x="118" y="218" font-size="12" fill="#1f9d55" text-anchor="middle">release rᵢ</text>
-
-  <!-- deadline arrow (down) -->
-  <line x1="560" y1="108" x2="560" y2="153" stroke="#e3342f" stroke-width="2.5"/>
-  <polygon points="560,159 554,146 566,146" fill="#e3342f"/>
-  <text x="560" y="100" font-size="12" fill="#e3342f" text-anchor="middle">deadline dᵢ</text>
-
-  <!-- start / finish ticks -->
-  <line x1="190" y1="150" x2="190" y2="160" stroke="#555" stroke-width="1.5"/>
-  <text x="190" y="174" font-size="11" fill="#777" text-anchor="middle">start sᵢ</text>
-  <line x1="422" y1="150" x2="422" y2="160" stroke="#555" stroke-width="1.5"/>
-  <text x="422" y="174" font-size="11" fill="#777" text-anchor="middle">finish fᵢ</text>
-
-  <!-- response time bracket -->
-  <line x1="118" y1="78" x2="422" y2="78" stroke="#003874" stroke-width="1.5"/>
-  <line x1="118" y1="74" x2="118" y2="82" stroke="#003874" stroke-width="1.5"/>
-  <line x1="422" y1="74" x2="422" y2="82" stroke="#003874" stroke-width="1.5"/>
-  <text x="270" y="68" font-size="12" fill="#003874" text-anchor="middle">response time Rᵢ = fᵢ − rᵢ</text>
-
-  <!-- slack / laxity -->
-  <line x1="422" y1="135" x2="560" y2="135" stroke="#BA9224" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="491" y="128" font-size="11" fill="#BA9224" text-anchor="middle">slack (laxity)</text>
-</svg>
+<img src="./figures/anatomy_job.svg" class="w-full max-w-3xl"/>
 </div>
 
 <div class="grid grid-cols-3 gap-3 text-xs">
@@ -458,50 +425,14 @@ One <b>system</b> usually mixes all three — this is a property of each <b>task
 
 Plot the **value** of a result against its **completion time**:
 
-<div class="grid grid-cols-3 gap-4 mt-4">
-
-<div class="text-center">
-<svg viewBox="0 0 220 160" class="w-full">
-  <line x1="30" y1="20" x2="30" y2="130" stroke="#888" stroke-width="1.5"/>
-  <line x1="30" y1="120" x2="210" y2="120" stroke="#888" stroke-width="1.5"/>
-  <text x="20" y="18" font-size="10" fill="#888">value</text>
-  <text x="205" y="145" font-size="10" fill="#888">time</text>
-  <line x1="120" y1="20" x2="120" y2="135" stroke="#e3342f" stroke-dasharray="4 3" stroke-width="1.5"/>
-  <text x="120" y="150" font-size="10" fill="#e3342f" text-anchor="middle">deadline</text>
-  <polyline points="30,55 120,55 120,150 210,150" fill="none" stroke="#e3342f" stroke-width="3"/>
-</svg>
-<div class="font-bold text-red-700 dark:text-red-300">Hard</div>
-<div class="text-xs opacity-70">value plunges far negative — catastrophe</div>
+<div class="flex justify-center mt-3">
+<img src="./figures/utility_functions.svg" class="w-full max-w-3xl"/>
 </div>
 
-<div class="text-center">
-<svg viewBox="0 0 220 160" class="w-full">
-  <line x1="30" y1="20" x2="30" y2="130" stroke="#888" stroke-width="1.5"/>
-  <line x1="30" y1="120" x2="210" y2="120" stroke="#888" stroke-width="1.5"/>
-  <text x="20" y="18" font-size="10" fill="#888">value</text>
-  <text x="205" y="145" font-size="10" fill="#888">time</text>
-  <line x1="120" y1="20" x2="120" y2="135" stroke="#e3342f" stroke-dasharray="4 3" stroke-width="1.5"/>
-  <text x="120" y="150" font-size="10" fill="#e3342f" text-anchor="middle">deadline</text>
-  <polyline points="30,55 120,55 120,120 210,120" fill="none" stroke="#BA9224" stroke-width="3"/>
-</svg>
-<div class="font-bold text-amber-700 dark:text-amber-300">Firm</div>
-<div class="text-xs opacity-70">value drops to zero — result discarded</div>
-</div>
-
-<div class="text-center">
-<svg viewBox="0 0 220 160" class="w-full">
-  <line x1="30" y1="20" x2="30" y2="130" stroke="#888" stroke-width="1.5"/>
-  <line x1="30" y1="120" x2="210" y2="120" stroke="#888" stroke-width="1.5"/>
-  <text x="20" y="18" font-size="10" fill="#888">value</text>
-  <text x="205" y="145" font-size="10" fill="#888">time</text>
-  <line x1="120" y1="20" x2="120" y2="135" stroke="#e3342f" stroke-dasharray="4 3" stroke-width="1.5"/>
-  <text x="120" y="150" font-size="10" fill="#e3342f" text-anchor="middle">deadline</text>
-  <polyline points="30,55 120,55 210,108" fill="none" stroke="#1f9d55" stroke-width="3"/>
-</svg>
-<div class="font-bold text-green-700 dark:text-green-300">Soft</div>
-<div class="text-xs opacity-70">value decays gradually — still useful</div>
-</div>
-
+<div class="grid grid-cols-3 gap-6 mt-1 text-center text-xs opacity-70">
+<div>value plunges far negative — catastrophe</div>
+<div>value drops to zero — result discarded</div>
+<div>value decays gradually — still useful</div>
 </div>
 
 <div v-click class="mt-4 text-sm text-center px-4 py-2 rounded bg-gray-100 dark:bg-gray-800">
@@ -647,29 +578,7 @@ Every one of these exists to make the system's timing <b>analysable in advance</
 From a hardware event to the task that handles it:
 
 <div class="my-4 flex justify-center">
-<svg viewBox="0 0 720 180" class="w-full max-w-3xl">
-  <!-- event arrow -->
-  <line x1="70" y1="30" x2="70" y2="78" stroke="#e3342f" stroke-width="2.5"/>
-  <polygon points="70,84 64,71 76,71" fill="#e3342f"/>
-  <text x="70" y="22" font-size="11" fill="#e3342f" text-anchor="middle">IRQ asserted</text>
-
-  <!-- segments -->
-  <rect x="70"  y="85" width="80"  height="38" fill="#e3342f" rx="2"/>
-  <rect x="150" y="85" width="200" height="38" fill="#003874" rx="2"/>
-  <rect x="350" y="85" width="90"  height="38" fill="#BA9224" rx="2"/>
-  <rect x="440" y="85" width="220" height="38" fill="#1f9d55" rx="2"/>
-
-  <text x="110" y="109" font-size="10.5" fill="#fff" text-anchor="middle">IRQ latency</text>
-  <text x="250" y="109" font-size="11" fill="#fff" text-anchor="middle">ISR runs</text>
-  <text x="395" y="109" font-size="10" fill="#fff" text-anchor="middle">dispatch</text>
-  <text x="550" y="109" font-size="11" fill="#fff" text-anchor="middle">task handles event</text>
-
-  <!-- total response bracket -->
-  <line x1="70" y1="145" x2="550" y2="145" stroke="#555" stroke-width="1.5"/>
-  <line x1="70" y1="141" x2="70" y2="149" stroke="#555" stroke-width="1.5"/>
-  <line x1="550" y1="141" x2="550" y2="149" stroke="#555" stroke-width="1.5"/>
-  <text x="310" y="163" font-size="11" fill="#555" text-anchor="middle">event-to-response latency — must be bounded</text>
-</svg>
+<img src="./figures/latency.svg" class="w-full max-w-3xl"/>
 </div>
 
 <div class="grid grid-cols-3 gap-3 text-xs">

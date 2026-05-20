@@ -9,37 +9,45 @@ One self-contained deck per course week, sharing the `seriph` theme.
 
 ```bash
 npm install        # once
-npm run dev        # opens Week 1 in the browser with live reload
+npm run dev        # opens the active week in the browser with live reload
 ```
 
-## Presenting / building a specific week
+## Project structure
 
-Each week is an independent Slidev entry file. Use the `slide` script:
+The Slidev project lives in the **repository root**.
 
-```bash
-npm run slide -- week01.md            # live presentation (dev server)
-npm run slide -- build week01.md      # static site -> dist/
-npm run slide -- export week01.md     # PDF export (needs playwright-chromium)
+```
+RTOS/
+├─ slides.md          Entry deck — holds deck config (theme, fonts) + `src:`
+├─ week01.md          Week 1 — Foundations of Real-Time Systems   (complete)
+├─ week02.md … week16.md   (to be added — see course map below)
+├─ figures/           TikZ figure sources (.tex) + compiled .svg + build.sh
+├─ global-bottom.vue  Global component — page numbers on every slide
+├─ package.json
+└─ rtos_syllabus.tex / .pdf, ref_books/   (course source material)
 ```
 
-PDF export requires the exporter dependency once:
+**`slides.md` is the entry point.** Slidev reads deck-level config (theme,
+fonts, transition) **only** from the entry file, so `slides.md` carries that
+config and then pulls in a week with `src: ./weekNN.md`. To present a different
+week, change the one `src:` line in `slides.md`.
+
+Each `weekNN.md` also keeps its own headmatter, so it can be run standalone too:
 
 ```bash
-npm i -D playwright-chromium
+npm run slide -- week02.md          # run a week deck directly
+```
+
+## Building & exporting
+
+```bash
+npm run build                       # static site -> dist/  (from slides.md)
+npm run export                      # PDF export (needs playwright-chromium)
+npm i -D playwright-chromium        # one-time, for PDF export
 ```
 
 While presenting: `f` fullscreen · `o` slide overview · `d` dark mode ·
 `g` go-to slide · arrow keys to navigate.
-
-## Layout
-
-```
-slides/
-├─ week01.md        Week 1 — Foundations of Real-Time Systems   (complete)
-├─ week02.md … week16.md   (to be added — see syllabus)
-├─ public/images/   shared figures referenced as /images/...
-└─ package.json
-```
 
 ## Course map (from rtos_syllabus.tex)
 
@@ -66,9 +74,20 @@ slides/
 
 - **Theme** — `seriph`, with KMUTNB blue (`#003874`) as the primary accent.
 - **Math** — KaTeX, `$...$` inline and `$$...$$` block.
-- **Diagrams** — Mermaid fenced blocks; hand-drawn timing figures as inline SVG.
+- **Diagrams** — authored as **TikZ** in `figures/*.tex`, compiled to SVG with
+  `figures/build.sh` (needs a LaTeX toolchain: `pdflatex` + `dvisvgm`).
 - **Code** — Shiki highlighting; line-by-line reveals via ```c {1|2-3|all}```.
 - **Builds** — incremental reveals use `<v-clicks>` / `v-click`.
+- **Image files** — keep them in `figures/` and reference them with a
+  **relative** path (`./figures/name.svg`). Do **not** put them in a `public/`
+  folder reached via `<img>` — Vite cannot import `public/` assets.
 
-To start a new week, copy `week01.md` as a template — keep the deck headmatter
-and the `<style>` block at the end so branding stays consistent.
+## Editing a diagram
+
+```bash
+# edit the TikZ source, e.g. figures/anatomy_job.tex, then:
+cd figures && ./build.sh        # recompiles every *.tex to *.svg
+```
+
+To start a new week, copy `week01.md` as a template — keep the headmatter and
+the `<style>` block at the end so branding stays consistent.

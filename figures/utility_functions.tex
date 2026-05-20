@@ -1,0 +1,51 @@
+% Utility-after-deadline curves — Hard / Firm / Soft
+% Compile:  pdflatex utility_functions.tex  &&  dvisvgm --pdf utility_functions.pdf
+\documentclass[border=3pt]{standalone}
+\usepackage{lmodern}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+
+\definecolor{kmgold}{HTML}{BA9224}
+\definecolor{rtgreen}{HTML}{1F9D55}
+\definecolor{rtred}{HTML}{E3342F}
+\definecolor{axgray}{HTML}{888888}
+
+% axes + deadline line, drawn once per panel
+\newcommand{\panelaxes}{%
+  \draw[axgray,line width=0.8pt,-Stealth] (0,-1.65) -- (0,2.05);
+  \draw[axgray,line width=0.8pt,-Stealth] (0,0) -- (4.4,0);
+  \node[axgray,font=\scriptsize,above] at (0,2.05) {value};
+  \node[axgray,font=\scriptsize,below] at (4.3,0) {time};
+  \draw[rtred,line width=0.8pt,dashed] (2,-1.5) -- (2,1.95);
+  \node[rtred,font=\tiny,below] at (2,-1.5) {deadline};
+}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily,x=1cm,y=1cm]
+
+  % ===== Panel 1 — Hard =====
+  \begin{scope}
+    \panelaxes
+    \draw[rtred,line width=1.5pt]
+      (0,1.05) -- (2,1.05) -- (2,-1.3) -- (4,-1.3);
+    \node[rtred,font=\sffamily\bfseries] at (2,-2.3) {Hard};
+  \end{scope}
+
+  % ===== Panel 2 — Firm =====
+  \begin{scope}[xshift=5.6cm]
+    \panelaxes
+    \draw[kmgold,line width=1.5pt]
+      (0,1.05) -- (2,1.05) -- (2,0) -- (4,0);
+    \node[kmgold,font=\sffamily\bfseries] at (2,-2.3) {Firm};
+  \end{scope}
+
+  % ===== Panel 3 — Soft =====
+  \begin{scope}[xshift=11.2cm]
+    \panelaxes
+    \draw[rtgreen,line width=1.5pt]
+      (0,1.05) -- (2,1.05) -- (4,0.25);
+    \node[rtgreen,font=\sffamily\bfseries] at (2,-2.3) {Soft};
+  \end{scope}
+
+\end{tikzpicture}
+\end{document}

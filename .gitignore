@@ -3,3 +3,9 @@ dist/
 .slidev/
 *.local
 .DS_Store
+
+# LaTeX build artifacts (figures/build.sh leaves only the .svg)
+figures/*.aux
+figures/*.log
+figures/*.pdf
+figures/*.synctex.gz
