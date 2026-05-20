@@ -1,0 +1,458 @@
+\documentclass[12pt, a4paper]{article}
+
+% Packages
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage{parskip}
+
+% Colors
+\definecolor{kmutnbBlue}{RGB}{0, 56, 116}
+\definecolor{kmutnbGold}{RGB}{186, 146, 36}
+\definecolor{lightGray}{RGB}{245, 245, 245}
+\definecolor{midGray}{RGB}{200, 200, 200}
+
+% Section Formatting
+\titleformat{\section}
+  {\large\bfseries\color{kmutnbBlue}}
+  {\thesection.}{0.5em}{}
+  [\color{kmutnbGold}\titlerule]
+
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{kmutnbBlue}}
+  {\thesubsection.}{0.5em}{}
+
+% Header / Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Department of Electrical and Computer Engineering}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{kmutnbGold}\leaders\hrule height \headrulewidth\hfill}}
+
+% Hyperlinks
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue
+}
+
+\begin{document}
+
+% Title Block
+\begin{center}
+  {\color{kmutnbBlue}\rule{\linewidth}{2pt}}\\[6pt]
+  {\LARGE\bfseries\color{kmutnbBlue} Course Syllabus}\\[4pt]
+  {\large\bfseries Real-Time Operating Systems}\\[2pt]
+  {\normalsize (Rabb patibatkan baeb Real-time)}\\[8pt]
+  {\color{kmutnbGold}\rule{\linewidth}{1pt}}
+\end{center}
+
+\vspace{0.5cm}
+
+% Course Information
+\section*{Course Information}
+
+\begin{tabular}{@{}p{4.5cm} p{9cm}@{}}
+  \textbf{Course Code}       & TBD \\[2pt]
+  \textbf{Course Title (EN)} & Real-Time Operating Systems \\[2pt]
+  \textbf{Course Title (TH)} & Rabb Patibatkan Baeb Real-time (see Thai version) \\[2pt]
+  \textbf{Credits}           & 3 Credits (3--0--6) \\[2pt]
+  \textbf{Level}             & Master of Engineering (M.Eng.) \\[2pt]
+  \textbf{Program}           & Electrical and Computer Engineering \\[2pt]
+  \textbf{Faculty}           & Faculty of Engineering, KMUTNB \\[2pt]
+  \textbf{Semester}          & \textit{[Semester / Academic Year]} \\[2pt]
+  \textbf{Instructor}        & \textit{[Instructor Name]}, Ph.D. \\[2pt]
+  \textbf{Contact}           & Department of ECE, KMUTNB \\[2pt]
+  \textbf{Office Hours}      & By appointment \\
+\end{tabular}
+
+% Course Description
+\section{Course Description}
+
+This course provides a rigorous graduate-level treatment of real-time operating systems
+(RTOS), covering both theoretical foundations and practical implementation on modern
+embedded hardware. Topics include real-time scheduling theory, task synchronization,
+inter-process communication, memory management, timing analysis, worst-case execution
+time (WCET) estimation, and advanced architectural features including TrustZone-M
+security partitioning and multi-core asymmetric multiprocessing (AMP).
+
+Laboratory sessions are conducted on the \textbf{NXP FRDM-MCXN236} development board
+(dual Cortex-M33 at 150\,MHz, 512\,KB SRAM) using \textbf{FreeRTOS} as the primary
+RTOS, with a comparative module on \textbf{Zephyr RTOS}. Students gain hands-on
+experience with professional-grade tools including SEGGER SystemView for real-time task
+tracing and the NXP MCUXpresso SDK.
+
+% Prerequisites
+\section{Prerequisites}
+
+\begin{itemize}[noitemsep]
+  \item Embedded systems or microcontroller programming (undergraduate level)
+  \item C programming proficiency
+  \item Basic operating systems concepts
+  \item Familiarity with ARM Cortex-M architecture is beneficial but not required
+\end{itemize}
+
+% Course Objectives
+\section{Course Objectives (CLOs)}
+
+Upon successful completion of this course, students will be able to:
+
+\begin{enumerate}[label=\textbf{CLO\arabic*.}, leftmargin=*, noitemsep]
+  \item \textbf{Explain} the theoretical foundations of real-time scheduling algorithms
+        including Rate Monotonic Scheduling (RMS) and Earliest Deadline First (EDF),
+        and perform schedulability analysis.
+  \item \textbf{Analyze} priority inversion problems and apply priority inheritance and
+        priority ceiling protocols to resolve resource contention.
+  \item \textbf{Implement} multi-task RTOS applications using FreeRTOS on ARM Cortex-M33,
+        including task management, queues, semaphores, mutexes, and event groups.
+  \item \textbf{Measure} worst-case execution time (WCET) and interrupt latency using
+        hardware cycle counters (DWT) and SEGGER SystemView tracing.
+  \item \textbf{Design} secure embedded systems leveraging TrustZone-M for
+        secure/non-secure world partitioning.
+  \item \textbf{Develop} multi-core AMP applications utilizing dual Cortex-M33 cores
+        with inter-core communication via shared memory and mailbox.
+  \item \textbf{Compare} RTOS design philosophies by contrasting FreeRTOS and Zephyr
+        RTOS in terms of architecture, API, and toolchain.
+  \item \textbf{Evaluate} current research literature in real-time systems and apply
+        findings to practical embedded system design.
+\end{enumerate}
+
+% Hardware and Software
+\section{Hardware and Software Tools}
+
+\subsection{Hardware Platform}
+\begin{tabular}{@{}p{4cm} p{9cm}@{}}
+  \textbf{Development Board} & NXP FRDM-MCXN236 \\
+  \textbf{MCU}               & NXP MCX N236 (dual Cortex-M33 @ 150 MHz) \\
+  \textbf{Memory}            & 1 MB Flash, 512 KB SRAM \\
+  \textbf{Security}          & TrustZone-M, EdgeLock Secure Subsystem \\
+  \textbf{NPU}               & eIQ Neutron Neural Processing Unit \\
+  \textbf{Debugger}          & Onboard MCU-Link (re-flashable to J-Link firmware) \\
+\end{tabular}
+
+\subsection{Software Tools}
+\begin{tabular}{@{}p{4cm} p{9cm}@{}}
+  \textbf{IDE}              & NXP MCUXpresso IDE / VS Code + MCUXpresso Extension \\
+  \textbf{SDK}              & NXP MCUXpresso SDK (FreeRTOS included) \\
+  \textbf{Debugger FW}      & MCU-Link re-flashed to J-Link (SEGGER, free) \\
+  \textbf{Tracer}           & SEGGER SystemView (free educational license) \\
+  \textbf{Debugger IDE}     & SEGGER Ozone (free with J-Link) \\
+  \textbf{Secondary RTOS}   & Zephyr RTOS (west build system) \\
+\end{tabular}
+
+% Required Texts
+\section{Required Texts and References}
+
+\subsection{Required}
+\begin{enumerate}[noitemsep]
+  \item \textbf{Laplante, P.A.} \textit{Real-Time Systems Design and Analysis:
+        Tools for the Practitioner}, 4th ed., IEEE Press/Wiley. \hfill\textit{[Main theory text]}
+  \item \textbf{Barry, R.} \textit{Mastering the FreeRTOS Real Time Kernel}.
+        FreeRTOS.org. \textit{[Free PDF at \href{https://www.freertos.org}{freertos.org}]}
+  \item \textbf{Yiu, J.} \textit{The Definitive Guide to Arm Cortex-M23 and
+        Cortex-M33 Processors}. Newnes/Elsevier, 2021.
+\end{enumerate}
+
+\subsection{Seminal Papers (via KMUTNB IEEE Xplore Access)}
+\begin{enumerate}[noitemsep]
+  \item \textbf{Liu \& Layland (1973)} -- ``Scheduling Algorithms for Multiprogramming
+        in a Hard Real-Time Environment,'' \textit{J. ACM}, 20(1):46--61.
+  \item \textbf{Sha, Rajkumar \& Lehoczky (1990)} -- ``Priority Inheritance Protocols:
+        An Approach to Real-Time Synchronization,'' \textit{IEEE Trans. Computers}, 39(9).
+  \item \textbf{Wilhelm et al. (2008)} -- ``The Worst-Case Execution-Time Problem:
+        Overview of Methods and Survey of Tools,'' \textit{ACM TECS}, 7(3).
+\end{enumerate}
+
+\subsection{Supplementary}
+\begin{enumerate}[noitemsep]
+  \item \textbf{Valvano, J.W.} \textit{Embedded Systems: RTOS for ARM Cortex-M}.
+        \textit{[Free at \href{http://users.ece.utexas.edu/~valvano}{users.ece.utexas.edu/\textasciitilde valvano}]}
+  \item NXP AN13958 -- Getting Started with FreeRTOS on MCX N Series.
+  \item NXP AN13813 -- TrustZone-M on MCX N Series.
+  \item MCX N236 Reference Manual, NXP Semiconductors.
+  \item SEGGER SystemView User Guide, SEGGER Microcontroller GmbH.
+\end{enumerate}
+
+% Course Schedule
+\section{Course Schedule}
+
+\renewcommand{\arraystretch}{1.4}
+
+\begin{longtable}{@{}>{\centering\bfseries}p{1cm} p{4.2cm} p{4.5cm} p{3.5cm}@{}}
+  \toprule
+  \rowcolor{kmutnbBlue}
+  \color{white}Week &
+  \color{white}Lecture Topics &
+  \color{white}Lab / Activity &
+  \color{white}Reading \\
+  \midrule
+  \endfirsthead
+
+  \toprule
+  \rowcolor{kmutnbBlue}
+  \color{white}Week &
+  \color{white}Lecture Topics &
+  \color{white}Lab / Activity &
+  \color{white}Reading \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+
+  % Module 1
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 1: Foundations of Real-Time Systems}} \\
+  \midrule
+
+  1 &
+  RT system taxonomy; hard/soft/firm deadlines; RTOS vs.\ GPOS characteristics &
+  Toolchain setup: MCUXpresso IDE, MCU-Link to J-Link re-flash, SystemView install &
+  Laplante Ch.\ 1--2 \newline Barry Ch.\ 1 \\
+
+  2 &
+  Task model; periodic, aperiodic, sporadic; timing constraints; utilization bound &
+  \textbf{Lab 1}: Hello FreeRTOS --- task creation, priorities, \texttt{vTaskDelay}, first SystemView trace &
+  Laplante Ch.\ 3 \newline Liu \& Layland (1973) \\
+
+  \midrule
+  % Module 2
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 2: Real-Time Scheduling Theory}} \\
+  \midrule
+
+  3 &
+  Rate Monotonic Scheduling (RMS); schedulability analysis; Liu \& Layland theorem &
+  \textbf{Lab 2}: Fixed-priority preemptive scheduling; observe context switches in SystemView &
+  Laplante Ch.\ 5 \newline Liu \& Layland (1973) \\
+
+  4 &
+  Earliest Deadline First (EDF); dynamic priority; RMS vs.\ EDF comparison; hyperperiod &
+  Paper discussion: Liu \& Layland (1973) --- schedulability proofs &
+  Laplante Ch.\ 6 \newline Barry Ch.\ 3 \\
+
+  5 &
+  Aperiodic and sporadic task handling; polling server; deferrable server; sporadic server &
+  \textbf{Lab 3}: Aperiodic handling with FreeRTOS software timers and deferred ISR pattern &
+  Laplante Ch.\ 6 \newline Barry Ch.\ 7 \\
+
+  \midrule
+  % Module 3
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 3: Synchronization and Inter-Task Communication}} \\
+  \midrule
+
+  6 &
+  Queues, semaphores, mutexes, event groups; FreeRTOS sync API; blocking behavior &
+  \textbf{Lab 4}: Producer--consumer queue; binary semaphore ISR-to-task sync; event groups &
+  Barry Ch.\ 6--8 \newline Laplante Ch.\ 7 \\
+
+  7 &
+  Priority inversion; Priority Inheritance Protocol (PIP); Priority Ceiling Protocol (PCP);
+  Stack Resource Policy (SRP) &
+  \textbf{Lab 5}: Priority inversion demo (3-task); resolve with FreeRTOS mutex; verify in SystemView &
+  Sha et al.\ (1990) \newline Laplante Ch.\ 7 \\
+
+  8 &
+  Deadlock; livelock; starvation; watchdog timers; defensive RTOS design patterns &
+  Paper discussion: Sha et al.\ (1990) --- PIP/PCP; mid-term review &
+  Laplante Ch.\ 8 \\
+
+  \midrule
+  \multicolumn{4}{c}{\cellcolor{midGray}\textbf{Mid-Term Examination (after Week 8)}} \\
+  \midrule
+
+  % Module 4
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 4: Timing Analysis and Memory Management}} \\
+  \midrule
+
+  9 &
+  WCET: definition, measurement, static analysis; DWT cycle counter on Cortex-M33;
+  interrupt latency &
+  \textbf{Lab 6}: WCET measurement using DWT; interrupt latency profiling; estimated vs.\ measured comparison &
+  Wilhelm et al.\ (2008) \newline Yiu Ch.\ 9, 14 \\
+
+  10 &
+  FreeRTOS memory management: heap\_1--heap\_5; stack sizing; overflow detection;
+  fragmentation &
+  \textbf{Lab 7}: Heap scheme comparison (heap\_4 vs.\ heap\_5); \texttt{uxTaskGetStackHighWaterMark}; overflow hook &
+  Barry Ch.\ 2 \newline Laplante Ch.\ 8 \\
+
+  \midrule
+  % Module 5
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 5: Advanced Hardware Features (FRDM-MCXN236)}} \\
+  \midrule
+
+  11 &
+  ARM TrustZone-M: secure/non-secure world; SAU configuration; secure gateway veneer;
+  RTOS in TrustZone &
+  \textbf{Lab 8}: TrustZone-M on MCX N236 --- FreeRTOS in non-secure world; secure peripheral access &
+  Yiu Ch.\ 17--19 \newline NXP AN13813 \\
+
+  12 &
+  Multi-core AMP vs.\ SMP; inter-core communication; shared memory; MCX N236 mailbox unit &
+  \textbf{Lab 9}: Dual-core AMP --- FreeRTOS on Core 0, bare-metal sensor on Core 1; mailbox data transfer &
+  Yiu Ch.\ 20 \newline MCX N236 RM \\
+
+  \midrule
+  % Module 6
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 6: Power Management and Zephyr RTOS}} \\
+  \midrule
+
+  13 &
+  Low-power RTOS: tickless idle; \texttt{configUSE\_TICKLESS\_IDLE}; Cortex-M33 sleep modes;
+  power measurement &
+  \textbf{Lab 10}: Tickless idle on FRDM-MCXN236; measure active vs.\ idle current; scheduling optimization &
+  Barry Ch.\ 10 \newline Yiu Ch.\ 13 \\
+
+  14 &
+  Zephyr RTOS: Kconfig, device tree, kernel services; comparison with FreeRTOS; west build &
+  \textbf{Lab 11}: Port FreeRTOS application to Zephyr (\texttt{frdm\_mcxn236} target); compare SystemView traces &
+  Zephyr Docs \newline Nordic Dev.\ Academy \\
+
+  \midrule
+  % Module 7
+  \multicolumn{4}{l}{\cellcolor{lightGray}%
+    \textbf{\color{kmutnbBlue}Module 7: Research Topics and Final Project}} \\
+  \midrule
+
+  15 &
+  Research frontiers: mixed-criticality systems; AUTOSAR OS; RTOS+ML (eIQ NPU);
+  safety standards IEC~61508, ISO~26262 &
+  Project milestone review; SystemView analysis consultation; thesis topic discussion &
+  Recent IEEE RTSS / RTAS papers \\
+
+  16 &
+  \multicolumn{3}{l}{\textbf{Final Project Presentations} ---
+    15-minute live demonstration + Q\&A per group} \\
+
+\end{longtable}
+
+% Assessment
+\section{Assessment and Grading}
+
+\begin{tabular}{@{}p{7.5cm} r@{}}
+  \toprule
+  \textbf{Assessment Component} & \textbf{Weight} \\
+  \midrule
+  Lab Reports (Labs 1--11, best 10 counted)   & 30\% \\
+  Paper Discussions (Weeks 4 and 8)           & 10\% \\
+  Mid-Term Examination                        & 20\% \\
+  Final Project (design + demo + report)      & 30\% \\
+  Participation and in-class activities       & 10\% \\
+  \midrule
+  \textbf{Total}                              & \textbf{100\%} \\
+  \bottomrule
+\end{tabular}
+
+\vspace{0.5em}
+\noindent\textbf{Grading Scale:}\quad
+A: $\geq 80\%$ \quad B+: 75--79\% \quad B: 70--74\% \quad
+C+: 65--69\% \quad C: 60--64\% \quad D/F: $<60\%$
+
+% Final Project
+\section{Final Project}
+
+Students (individually or in pairs) design and implement a complete real-time embedded
+application on the FRDM-MCXN236 board. Suggested themes:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{IoT sensor node} --- multi-task FreeRTOS with UART/LoRa, tickless idle power optimization
+  \item \textbf{Motor control RTOS} --- hard real-time PWM task + supervisory tasks with schedulability report
+  \item \textbf{Secure edge gateway} --- TrustZone-M with secure key storage and non-secure FreeRTOS app
+  \item \textbf{Dual-core AMP system} --- sensor acquisition on Core 1, data processing + communication on Core 0
+  \item \textbf{RTOS + ML inference} --- FreeRTOS scheduler with eIQ NPU task; scheduling overhead analysis
+\end{itemize}
+
+\noindent\textbf{Deliverables:}
+\begin{enumerate}[noitemsep]
+  \item Final report including schedulability analysis, SystemView screenshots, and WCET measurements
+  \item Live hardware demonstration (Week 16)
+  \item Source code submission via university LMS
+\end{enumerate}
+
+% Lab Summary
+\section{Laboratory Summary}
+
+\begin{tabular}{@{}>{\centering\bfseries}p{1.2cm} p{5cm} p{7cm}@{}}
+  \toprule
+  \textbf{Lab} & \textbf{Title} & \textbf{Key Skills Developed} \\
+  \midrule
+  1  & Hello FreeRTOS            & Task API, SystemView setup and configuration \\
+  2  & Preemptive Scheduling     & Priority assignment, context switch observation \\
+  3  & Aperiodic Task Handling   & Software timers, deferred interrupt service \\
+  4  & IPC Mechanisms            & Queues, semaphores, event groups \\
+  5  & Priority Inversion        & Mutex, PIP demonstration, SystemView analysis \\
+  6  & WCET Measurement          & DWT cycle counter, interrupt latency profiling \\
+  7  & Memory Management         & Heap scheme comparison, stack high-water mark \\
+  8  & TrustZone-M Security      & SAU config, secure/non-secure partitioning \\
+  9  & Dual-Core AMP             & Inter-core mailbox, multi-core RTOS design \\
+  10 & Low-Power RTOS            & Tickless idle, current measurement, optimization \\
+  11 & Zephyr RTOS               & West toolchain, device tree, API comparison \\
+  \bottomrule
+\end{tabular}
+
+% Course Policies
+\section{Course Policies}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Lab attendance} is mandatory. Missed labs may be made up within one
+        week with prior instructor notification.
+  \item \textbf{Late submissions} are penalized 10\% per calendar day.
+  \item \textbf{Hardware responsibility}: Each student is responsible for the
+        FRDM-MCXN236 board assigned to them. Damage must be reported immediately.
+  \item \textbf{Paper discussions} require a one-page critical summary submitted
+        before class via LMS.
+  \item All submitted work must represent the student's own effort in accordance with
+        KMUTNB academic integrity regulations.
+\end{itemize}
+
+% Reading Map
+\section{Reading Map by Course Module}
+
+\begin{tabular}{@{}p{4.5cm} p{3.5cm} p{5.5cm}@{}}
+  \toprule
+  \textbf{Topic} & \textbf{Primary Source} & \textbf{Supplement} \\
+  \midrule
+  Scheduling theory (RMS, EDF) & Laplante Ch.\ 5--6 & Liu \& Layland (1973) \\
+  Priority inversion / PIP & Laplante Ch.\ 7 & Sha et al.\ (1990) \\
+  WCET analysis & Wilhelm et al.\ (2008) & Yiu Ch.\ 14 \\
+  FreeRTOS API & Barry Ch.\ 1--10 & MCUXpresso SDK examples \\
+  Cortex-M33 internals & Yiu Ch.\ 1--16 & MCX N236 Reference Manual \\
+  TrustZone-M & Yiu Ch.\ 17--19 & NXP AN13813 \\
+  Dual-core AMP & Yiu Ch.\ 20 & MCX N236 RM (Mailbox) \\
+  Low-power design & Barry Ch.\ 10 & Yiu Ch.\ 13 \\
+  Zephyr RTOS & Zephyr Docs & Nordic Developer Academy \\
+  Research frontiers & IEEE RTSS/RTAS papers & Course handouts \\
+  \bottomrule
+\end{tabular}
+
+\vspace{1cm}
+\noindent\textit{This syllabus is subject to modification. Any changes will be
+announced via the course LMS and take effect no earlier than one week after
+notification.}
+
+\vspace{0.8cm}
+\noindent\begin{tabular}{@{}p{6cm} p{6cm}@{}}
+  \textbf{Instructor Signature:} & \\[1.5cm]
+  \rule{5.5cm}{0.4pt} & \rule{4cm}{0.4pt} \\
+  Instructor & Date \\
+\end{tabular}
+
+\end{document}

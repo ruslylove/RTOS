@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"slidev.force-enabled": true,
+		"slidev.include": [
+			"**/slides.md",
+			"slides/week01.md",
+			"week01.md"
+		]
+	}
+}
