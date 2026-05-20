@@ -108,7 +108,8 @@
 
   % panel label
   \node[dkgray,font=\sffamily\small\bfseries,anchor=west] at (-0.1,3.05)
-        {EDF \enspace (\emph{dynamic priority:} earlier deadline first)};
+        {EDF \enspace (\emph{dynamic priority:} earlier deadline first)
+         \enspace\normalfont\scriptsize same releases $\uparrow$rel as above};
 
   % time axis
   \draw[axgray,line width=0.7pt,->] (-0.15,0.6) -- (13.2,0.6)
@@ -143,12 +144,6 @@
     \draw[kmgold,line width=0.5pt,rounded corners=1.5pt]
           (\s,\yD) rectangle (\e,\yD+\h);
   }
-
-  % release arrows (EDF)
-  \foreach \t in {0,4,8,12}
-    \draw[kmblue,line width=0.9pt,->] (\t,\yC-0.25) -- (\t,\yC-0.02);
-  \foreach \t in {0,6,12}
-    \draw[kmgold,line width=0.9pt,->] (\t,\yD-0.25) -- (\t,\yD-0.02);
 
   % deadline marks (EDF)
   \foreach \t in {4,8,12}
