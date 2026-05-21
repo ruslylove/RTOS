@@ -3,6 +3,14 @@ dist/
 .slidev/
 *.local
 .DS_Store
+*.vsix
+
+# Lab build artifacts
+labs/**/*.elf
+labs/**/*.bin
+labs/**/*.map
+labs/**/*.o
+labs/**/FreeRTOS-Kernel/
 
 # LaTeX build artifacts (figures/build.sh leaves only the .svg)
 figures/*.aux
