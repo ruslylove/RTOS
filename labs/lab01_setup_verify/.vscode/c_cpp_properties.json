@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "ARM Cortex-M33",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/SystemView",
+                "${workspaceFolder}/FreeRTOS-Kernel/include",
+                "${workspaceFolder}/FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure"
+            ],
+            "defines": [
+                "__ARM_ARCH_8M_MAIN__"
+            ],
+            "compilerPath": "/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m33+nodsp",
+                "-mthumb"
+            ],
+            "cStandard": "c11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

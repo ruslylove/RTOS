@@ -1,0 +1,574 @@
+\documentclass[11pt, a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm, headheight=28pt]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{fontawesome5}
+\usepackage{microtype}
+\usepackage{graphicx}
+
+% ── Colors (KMUTNB brand) ──────────────────────────────────────────────────────
+\definecolor{kmutnbBlue}{RGB}{0,56,116}
+\definecolor{kmutnbGold}{RGB}{186,146,36}
+\definecolor{lightGray}{RGB}{245,245,245}
+\definecolor{midGray}{RGB}{200,200,200}
+\definecolor{codeGray}{RGB}{248,248,248}
+\definecolor{codeFrame}{RGB}{220,220,220}
+\definecolor{tipteal}{RGB}{0,105,92}
+\definecolor{warnAmber}{RGB}{121,85,0}
+\definecolor{checkGreen}{RGB}{27,94,32}
+
+% ── Section formatting ─────────────────────────────────────────────────────────
+\titleformat{\section}
+  {\large\bfseries\color{kmutnbBlue}}
+  {\thesection.}{0.5em}{}
+  [\color{kmutnbGold}\titlerule]
+
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{kmutnbBlue}}
+  {\thesubsection.}{0.5em}{}
+
+\titleformat{\subsubsection}
+  {\small\bfseries\color{kmutnbBlue}}
+  {\thesubsubsection.}{0.5em}{}
+
+\titlespacing*{\section}{0pt}{1.4ex plus .2ex}{0.6ex plus .1ex}
+\titlespacing*{\subsection}{0pt}{1.0ex plus .2ex}{0.4ex plus .1ex}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 01}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+% ── Hyperlinks ─────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 01 — Toolchain and Environment Verification},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ── Listings (C and bash) ──────────────────────────────────────────────────────
+\lstdefinestyle{cstyle}{
+  language        = C,
+  basicstyle      = \ttfamily\small,
+  keywordstyle    = \bfseries\color{kmutnbBlue},
+  commentstyle    = \itshape\color{gray},
+  stringstyle     = \color{tipteal},
+  numberstyle     = \tiny\color{midGray},
+  numbers         = left,
+  numbersep       = 6pt,
+  stepnumber      = 1,
+  backgroundcolor = \color{codeGray},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  showstringspaces= false,
+  tabsize         = 4,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.8em,
+  belowskip       = 0.8em,
+}
+
+\lstdefinestyle{bashstyle}{
+  language        = bash,
+  basicstyle      = \ttfamily\small,
+  keywordstyle    = \color{kmutnbBlue},
+  commentstyle    = \itshape\color{gray},
+  backgroundcolor = \color{black!5},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  showstringspaces= false,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.6em,
+  belowskip       = 0.6em,
+}
+
+\lstdefinestyle{textstyle}{
+  basicstyle      = \ttfamily\footnotesize,
+  backgroundcolor = \color{black!4},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.6em,
+  belowskip       = 0.6em,
+}
+
+% ── Callout boxes ──────────────────────────────────────────────────────────────
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{tipbox}[1][]{
+  enhanced, breakable,
+  colback=tipteal!8, colframe=tipteal, coltitle=white,
+  fonttitle=\bfseries\small, title={\faLightbulb\quad Tip#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{warnbox}[1][]{
+  enhanced, breakable,
+  colback=warnAmber!8, colframe=kmutnbGold, coltitle=white,
+  fonttitle=\bfseries\small, title={\faExclamationTriangle\quad Note#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{checkpointbox}[1][]{
+  enhanced,
+  colback=kmutnbBlue!6, colframe=kmutnbBlue, coltitle=white,
+  fonttitle=\bfseries\small, title={\faCheckCircle\quad Checkpoint#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{questionbox}[1][]{
+  enhanced, breakable,
+  colback=kmutnbGold!10, colframe=kmutnbGold, coltitle=white,
+  fonttitle=\bfseries\small, title={\faQuestion\quad Question#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+% ── Checkbox list ──────────────────────────────────────────────────────────────
+\newlist{checklist}{itemize}{1}
+\setlist[checklist]{label=\faSquare[regular], leftmargin=1.5em, noitemsep}
+
+% ── Misc helpers ───────────────────────────────────────────────────────────────
+\newcommand{\file}[1]{\texttt{\small #1}}
+\newcommand{\api}[1]{\texttt{\small #1}}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title block ───────────────────────────────────────────────────────────────
+\begin{center}
+  {\color{kmutnbBlue}\rule{\linewidth}{2pt}}\\[6pt]
+  {\LARGE\bfseries\color{kmutnbBlue} Laboratory 01}\\[4pt]
+  {\large\bfseries Toolchain \& Environment Verification}\\[2pt]
+  {\normalsize Real-Time Operating Systems \enspace\textbullet\enspace
+   M.Eng.\ ECE \enspace\textbullet\enspace KMUTNB}\\[8pt]
+  {\color{kmutnbGold}\rule{\linewidth}{1pt}}
+\end{center}
+
+\vspace{0.3cm}
+
+\begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
+  \textbf{Platform}     & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 96\,MHz) \\[2pt]
+  \textbf{RTOS}         & FreeRTOS (bare-metal, no SDK) \\[2pt]
+  \textbf{Toolchain}    & ARM GNU Toolchain (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+  \textbf{Tools}        & pyocd, SEGGER SystemView \\[2pt]
+  \textbf{Estimated time} & 2--3 hours \\[2pt]
+  \textbf{CLO mapping}  & CLO\,1 (foundations) \enspace CLO\,3 (FreeRTOS implementation) \\
+\end{tabular}
+
+\vspace{0.4cm}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item Build and flash a bare-metal FreeRTOS project using the ARM cross-compiler toolchain.
+  \item Verify that FreeRTOS creates and schedules tasks correctly by reading UART output.
+  \item Integrate SEGGER SystemView into a FreeRTOS project and capture a real-time trace.
+  \item Identify task context switches on the SystemView timeline.
+  \item Observe how task priority affects scheduling --- the foundation for Module~2.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+Complete the \textbf{Lab 1 Setup Guide} (\file{lab01\_setup\_guide.md}) before starting:
+
+\begin{checklist}
+  \item ARM GNU Toolchain installed; \texttt{arm-none-eabi-gcc} is on \texttt{PATH}
+        (or toolchain path set in \file{Makefile})
+  \item \texttt{pyocd} installed (\texttt{pip install pyocd})
+  \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
+  \item MCU-Link firmware \textbf{re-flashed to J-Link} (Setup Guide Step~3)
+  \item SEGGER SystemView installed on your laptop
+\end{checklist}
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab01_setup_verify/
+  Makefile                  <- build, flash, and debug targets
+  linker_MCXN236.ld         <- flash/RAM memory map
+  src/
+    startup_MCXN236.s       <- vector table + Reset_Handler
+    main.c                  <- hw_init, tasks, scheduler start
+    FreeRTOSConfig.h        <- kernel configuration
+    uart.h / uart.c         <- bare-metal LPUART4 driver
+    SystemView/             <- (created in Part C -- you add these)
+  FreeRTOS-Kernel/          <- (cloned in Part A)
+\end{lstlisting}
+
+\subsection{What the code does}
+
+Two FreeRTOS tasks run in this lab:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} l c c p{6.5cm} @{}}
+  \toprule
+  \textbf{Task} & \textbf{Priority} & \textbf{Period} & \textbf{What it does} \\
+  \midrule
+  \texttt{vBlinkTask}     & 2 (HIGH) & 500\,ms  &
+    Prints \texttt{LED ON} / \texttt{LED OFF} plus a toggle counter \\
+  \texttt{vHeartbeatTask} & 1 (LOW)  & 1000\,ms &
+    Prints the FreeRTOS tick uptime in milliseconds \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\medskip
+A shared \textbf{UART mutex} (\api{xUartMutex}) prevents the two tasks from printing
+at the same time --- the simplest possible example of a critical section.
+
+The key hardware initialisation in \file{main.c} switches the MCXN236 core clock from
+the default FRO 12\,MHz to FRO 96\,MHz before the scheduler starts, so that
+\texttt{configCPU\_CLOCK\_HZ} matches the actual oscillator.
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Build and Flash}
+
+\subsection{Step 1 --- Clone FreeRTOS-Kernel}
+
+\begin{lstlisting}[style=bashstyle]
+cd labs/lab01_setup_verify
+make setup
+\end{lstlisting}
+
+This runs \texttt{git clone --depth=1} to fetch the FreeRTOS kernel source into
+\file{FreeRTOS-Kernel/}.  You only need to do this once.
+
+\subsection{Step 2 --- Build}
+
+\begin{lstlisting}[style=bashstyle]
+make
+\end{lstlisting}
+
+Expected output (sizes will vary slightly):
+
+\begin{lstlisting}[style=textstyle]
+arm-none-eabi-gcc  ...  -o lab01.elf
+arm-none-eabi-objcopy -O binary lab01.elf lab01.bin
+arm-none-eabi-size lab01.elf
+   text    data     bss     dec     hex filename
+  12xxx     xxx   xxxxx   xxxxx    xxxx lab01.elf
+\end{lstlisting}
+
+\begin{warnbox}
+  If \texttt{arm-none-eabi-gcc: not found}, either add the toolchain directory to
+  \texttt{PATH}, or set the path at the top of \file{Makefile}:
+  \begin{lstlisting}[style=bashstyle, aboveskip=0pt, belowskip=0pt]
+  TOOLCHAIN ?= /path/to/arm-none-eabi/bin
+  \end{lstlisting}
+\end{warnbox}
+
+\subsection{Step 3 --- Flash}
+
+Connect the board, then:
+
+\begin{lstlisting}[style=bashstyle]
+make flash
+\end{lstlisting}
+
+pyocd erases, programs, and resets the MCU.  The board starts running immediately.
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- UART Output Verification}
+
+Open a serial terminal on your laptop.  The board exposes a CDC-ACM virtual COM port
+over the same USB cable used for flashing.
+
+\textbf{macOS / Linux:}
+\begin{lstlisting}[style=bashstyle]
+ls /dev/tty.usbmodem*        # find the port
+screen /dev/tty.usbmodemXXXX 115200
+# or: minicom -b 115200 -D /dev/tty.usbmodemXXXX
+\end{lstlisting}
+
+\textbf{Windows:} PuTTY or Tera Term --- \texttt{COMx}, 115200\,baud, 8N1.
+
+\subsection{Expected output}
+
+\begin{lstlisting}[style=textstyle]
+=== RTOS Lab 01: Toolchain & Environment Verify ===
+Tasks: Blink (500 ms) | Heartbeat (1000 ms)
+SystemView: disabled (rebuild with: make SYSVIEW=1)
+
+[MAIN] Starting scheduler...
+
+[BLINK] LED ON   (toggle #1)
+[BLINK] LED OFF  (toggle #2)
+[HB]    uptime = 1000 ms
+[BLINK] LED ON   (toggle #3)
+[BLINK] LED OFF  (toggle #4)
+[HB]    uptime = 2000 ms
+\end{lstlisting}
+
+\begin{tipbox}
+  \textbf{Key observations:}
+  \begin{itemize}[noitemsep]
+    \item \texttt{[BLINK]} prints \emph{twice} for every one \texttt{[HB]} line,
+          reflecting 500\,ms vs.\ 1000\,ms periods.
+    \item Uptime increments by exactly 1000\,ms each line --- the FreeRTOS 1\,kHz
+          tick is running correctly.
+  \end{itemize}
+\end{tipbox}
+
+\begin{checkpointbox}
+  Show a terminal capture of at least 5 seconds of output to your instructor.
+\end{checkpointbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- SEGGER SystemView Integration}
+
+The setup guide (Step~4) covers the SystemView integration in detail.  Follow the
+steps below to add the source files to \file{src/SystemView/} and rebuild with the
+\texttt{SYSVIEW=1} flag.
+
+\subsection{Step 1 --- Copy SystemView source files}
+
+Locate your SystemView installation.  On macOS it is typically:
+\begin{lstlisting}[style=textstyle]
+/Applications/SEGGER/SystemView_V3xx/Src/
+\end{lstlisting}
+
+Create the folder \file{src/SystemView/} and copy:
+
+\begin{lstlisting}[style=textstyle]
+SEGGER_SYSVIEW.c                        SEGGER_SYSVIEW.h
+SEGGER_SYSVIEW_ConfDefaults.h           SEGGER_SYSVIEW_Int.h
+SEGGER_RTT.c                            SEGGER_RTT.h
+SEGGER_RTT_Conf.h                       SEGGER_RTT_printf.c
+Config/SEGGER_SYSVIEW_Config_FreeRTOS.c
+Sample/OS/SEGGER_SYSVIEW_FreeRTOS.h
+\end{lstlisting}
+
+\subsection{Step 2 --- Configure the target descriptor}
+
+Open \file{src/SystemView/SEGGER\_SYSVIEW\_Config\_FreeRTOS.c} and update:
+
+\begin{lstlisting}[style=cstyle]
+#define SYSVIEW_APP_NAME    "Lab 01 -- Setup Verify"
+#define SYSVIEW_DEVICE_NAME "Cortex-M33"
+#define SYSVIEW_RAM_BASE    0x20000000u
+\end{lstlisting}
+
+\subsection{Step 3 --- Build with SystemView enabled}
+
+\begin{lstlisting}[style=bashstyle]
+make sysview      # equivalent to:  make SYSVIEW=1
+\end{lstlisting}
+
+The Makefile adds \texttt{-DUSE\_SYSVIEW} and compiles the SystemView source files
+automatically.  \file{main.c} calls \api{SEGGER\_SYSVIEW\_Conf()} before
+\api{vTaskStartScheduler()} when this flag is set.
+
+\subsection{Step 4 --- Capture a trace}
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item Flash the new binary:
+        \begin{lstlisting}[style=bashstyle, aboveskip=2pt, belowskip=2pt]
+make SYSVIEW=1 flash
+        \end{lstlisting}
+  \item Open \textbf{SEGGER SystemView} on your laptop.
+  \item Go to \textbf{Target $\to$ Start Recording}.
+  \item Enter connection parameters:
+        \textbf{Target Device:}~\texttt{MCXN236} \enspace
+        \textbf{Interface:}~\texttt{SWD} \enspace
+        \textbf{Speed:}~\texttt{Auto}
+  \item Click \textbf{OK}.
+\end{enumerate}
+
+You should see the real-time Gantt chart with \texttt{Blink} and \texttt{HB} tasks
+alternating every 500\,ms and 1000\,ms.
+
+\begin{checkpointbox}
+  Screenshot the SystemView timeline showing both tasks over at least 2 seconds of
+  recording.
+\end{checkpointbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Experiments}
+
+Work through the experiments in order.  For each one, record what you observe (terminal
+output or SystemView screenshot) and answer the question that follows.
+
+\subsection{Experiment 1 --- Priority swap}
+
+In \file{main.c}, swap the task priorities:
+
+\begin{lstlisting}[style=cstyle]
+xTaskCreate(vBlinkTask,     "Blink", configMINIMAL_STACK_SIZE, NULL, 1, NULL); /* was 2 */
+xTaskCreate(vHeartbeatTask, "HB",    configMINIMAL_STACK_SIZE, NULL, 2, NULL); /* was 1 */
+\end{lstlisting}
+
+Rebuild, flash, and observe.
+
+\begin{questionbox}
+  Does the output order or timing change?  Why or why not?
+
+  \textit{Hint: both tasks spend almost all their time blocked inside
+  \api{vTaskDelay}.  Think about what happens when both unblock at the exact same tick.}
+\end{questionbox}
+
+\subsection{Experiment 2 --- Equal priorities}
+
+Set both tasks to the same priority:
+
+\begin{lstlisting}[style=cstyle]
+xTaskCreate(vBlinkTask,     "Blink", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+xTaskCreate(vHeartbeatTask, "HB",    configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+\end{lstlisting}
+
+\begin{questionbox}
+  What scheduling policy does FreeRTOS apply when two tasks have equal priority and are
+  both ready?  Where exactly in \file{FreeRTOSConfig.h} is this behaviour configured?
+\end{questionbox}
+
+\subsection{Experiment 3 --- Periods and CPU load}
+
+Restore the original priorities (Blink~= 2, HB~= 1).  Change
+\texttt{vBlinkTask}'s period from 500\,ms to 50\,ms:
+
+\begin{lstlisting}[style=cstyle]
+vTaskDelay(pdMS_TO_TICKS(50));
+\end{lstlisting}
+
+Rebuild and capture a SystemView trace.
+
+\begin{questionbox}
+  Open the \textbf{CPU Load} view in SystemView (\textbf{View $\to$ CPU Load}).
+  What fraction of CPU time does \texttt{Blink} consume?
+
+  Now compute the utilization by hand using:
+  \[
+    U \;=\; \frac{C_{\text{Blink}}}{T_{\text{Blink}}} + \frac{C_{\text{HB}}}{T_{\text{HB}}}
+  \]
+  Estimate $C_i$ from the trace.  Do the measured and computed values agree?
+  Explain any discrepancy.
+\end{questionbox}
+
+\subsection{Experiment 4 --- Remove the mutex (observe the problem)}
+
+Keep the 50\,ms Blink period from Experiment~3.  In both task bodies, comment out the
+\api{xSemaphoreTake} / \api{xSemaphoreGive} calls (keep the \api{uart\_printf} lines):
+
+\begin{lstlisting}[style=cstyle]
+/* xSemaphoreTake(xUartMutex, portMAX_DELAY); */
+uart_printf("[BLINK] ...\n");
+/* xSemaphoreGive(xUartMutex); */
+\end{lstlisting}
+
+\begin{questionbox}
+  Do you observe corrupted or interleaved output on the terminal?
+
+  Why is this a \textbf{race condition} even on a \emph{single-core} microcontroller?
+  What category of kernel primitive fixes it, and exactly what resource does the mutex
+  protect here?
+\end{questionbox}
+
+\begin{warnbox}
+  Restore the mutex calls before submitting your work.
+\end{warnbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+Submit the following to the course LMS by the posted deadline:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4cm} p{8cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Terminal capture  & 5+ seconds showing correct \texttt{[BLINK]} / \texttt{[HB]} output \\
+  2 & SystemView screenshot & Timeline with both tasks, $\geq$ 2 seconds of recording \\
+  3 & Answers to Q1--Q4 & A few sentences each; reference the code or trace \\
+  4 & Modified \file{main.c} & From Experiment~3 (50\,ms Blink, mutex restored) \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Introduced}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{6.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Preemptive, priority-based scheduling & Priority swap (Experiment~1) \\
+  Time-slicing among equal-priority tasks & Equal priority (Experiment~2) \\
+  CPU utilization $U = C/T$ & CPU Load view (Experiment~3) \\
+  Race condition on a shared resource & Mutex removal (Experiment~4) \\
+  Mutex as a critical-section guard & \api{xUartMutex} throughout \\
+  Periodic task with \api{vTaskDelay} & \texttt{vBlinkTask}, \texttt{vHeartbeatTask} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\medskip
+These are the building blocks for Module~2 (scheduling theory) and Module~3
+(synchronisation).
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\begin{tabular}{@{} p{6.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Barry, \textit{Mastering the FreeRTOS Kernel} &
+    Ch.~1 (tasks), Ch.~3 (queue/semaphore basics) \\
+  Laplante, \textit{Real-Time Systems Design} &
+    Ch.~1--2 (task model, deadline classes) \\
+  FreeRTOS documentation &
+    \api{xTaskCreate}, \api{vTaskDelay}, \api{xSemaphoreCreateMutex} \\
+  SEGGER SystemView User Guide &
+    Recording setup, CPU Load view \\
+  \bottomrule
+\end{tabular}
+
+\end{document}
