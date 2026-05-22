@@ -11,6 +11,7 @@ info: |
 class: text-center
 transition: slide-left
 mdc: true
+routeAlias: week-4
 fonts:
   sans: Inter
   serif: Lora
@@ -161,8 +162,10 @@ EDF compares: $d_{\tau_2} = 6 < d_{\tau_1} = 8$.
 **τ₂ continues running** — not preempted, despite τ₁ arriving.
 
 <div class="mt-3 opacity-80">
+
 Under RMS τ₁ would preempt τ₂ here (shorter period = higher fixed priority),
 causing τ₂ to miss its deadline at $t=6$.
+
 </div>
 
 </div>
@@ -218,7 +221,7 @@ layout: two-cols
 layoutClass: gap-6
 ---
 
-# Proof — Necessity ($U \le 1$)
+# Proof — Necessity (U ≤ 1)
 
 If $U > 1$, the total demand **exceeds** the available CPU time in any interval.
 
@@ -240,7 +243,7 @@ So $U > 1$ → infeasible for every algorithm.
 
 <div class="mt-6">
 
-### Proof — Sufficiency ($U \le 1$)
+### Proof — Sufficiency (U ≤ 1)
 
 <div class="text-sm mt-2">
 
@@ -279,12 +282,16 @@ The gap between what EDF and RMS can schedule:
 <div v-click class="mt-5 grid grid-cols-2 gap-4 text-sm">
 
 <div class="px-4 py-3 rounded bg-amber-50 dark:bg-amber-900/30">
+
 For large $n$, $U_{\text{lub}} \to \ln 2 \approx 0.693$.
 <b>Up to 30.7 % of the CPU</b> is inaccessible to RMS but usable by EDF.
+
 </div>
 
 <div class="px-4 py-3 rounded bg-blue-50 dark:bg-blue-900/30">
+
 Set B ($U = 0.908$) is easily scheduled by EDF — the utilization test passes immediately, no RTA needed.
+
 </div>
 
 </div>
@@ -335,7 +342,7 @@ layout: section
 |-----------|-----|-----|
 | **Priority type** | fixed (per task) | dynamic (per job) |
 | **Schedulability test** | $U \le U_{\text{lub}}$ or RTA | $U \le 1$ |
-| **CPU utilisation** | up to $\approx$69.3 % guaranteed | up to 100 % |
+| **CPU utilisation** | up to ≈69.3 % guaranteed | up to 100 % |
 | **Runtime overhead** | O(1) dispatch | O(n) priority-queue update |
 | **Implementation** | trivial (static priority table) | requires per-job deadline tracking |
 | **Overload behaviour** | low-priority tasks miss; high-priority safe | any task can miss (unpredictable) |
@@ -375,7 +382,9 @@ IEC 61508, ISO 26262, DO-178C analysis tools are mature for fixed-priority. EDF 
 When $U > 1$ under EDF, **any task** may miss a deadline — the algorithm has no way to protect high-priority work.
 
 <div class="mt-3">
+
 The classic failure: a bursty interrupt load pushes $U$ above 1 for a brief window. Under EDF, every task in the system is at risk. Under RMS, only the lowest-priority ones are.
+
 </div>
 
 <div class="mt-3 opacity-80 text-xs">
@@ -455,11 +464,15 @@ $$ \text{dbf}(0, L) \;=\; \sum_{i=1}^{n} \max\!\left(0,\; \left\lfloor \frac{L -
 $\text{dbf}(0, L)$ counts only jobs whose **both** release time and deadline fall within $[0, L]$ — the "firmly bounded" demand.
 
 <div class="mt-3">
+
 In practice you only need to check $L$ at <b>scheduling points</b> — absolute deadlines. The check is finite over one hyperperiod.
+
 </div>
 
 <div class="mt-3 opacity-80">
+
 For implicit deadlines ($D_i = T_i$) the DBF simplifies back to $U \le 1$ — consistent with the earlier theorem.
+
 </div>
 
 </div>
@@ -475,18 +488,27 @@ When $D_i > T_i$ (jobs of the same task can overlap), analysis becomes significa
 <div class="mt-5 grid grid-cols-3 gap-4 text-sm">
 
 <div class="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800">
-<div class="font-bold">Implicit ($D_i = T_i$)</div>
-<div class="mt-2">EDF: $U \le 1$<br/>RMS: $U \le U_{\text{lub}}$ or RTA.<br/>Analysis tractable.</div>
+
+**Implicit ($D_i = T_i$)**
+
+EDF: $U \le 1$<br/>RMS: $U \le U_{\text{lub}}$ or RTA.<br/>Analysis tractable.
+
 </div>
 
 <div class="px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/30">
-<div class="font-bold">Constrained ($D_i \le T_i$)</div>
-<div class="mt-2">EDF: DBF test.<br/>RMS: DMS + extended RTA.<br/>Still polynomial.</div>
+
+**Constrained ($D_i \le T_i$)**
+
+EDF: DBF test.<br/>RMS: DMS + extended RTA.<br/>Still polynomial.
+
 </div>
 
 <div class="px-4 py-3 rounded-lg bg-rose-50 dark:bg-rose-900/30">
-<div class="font-bold">Arbitrary ($D_i$ unconstrained)</div>
-<div class="mt-2">Feasibility testing is <b>coNP-hard</b>. Simulation or bounding approaches needed.</div>
+
+**Arbitrary ($D_i$ unconstrained)**
+
+Feasibility testing is <b>coNP-hard</b>. Simulation or bounding approaches needed.
+
 </div>
 
 </div>

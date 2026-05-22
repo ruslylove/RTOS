@@ -44,6 +44,7 @@ each weekNN.md keeps its own headmatter:  npm run slide -- week02.md
 
 ---
 layout: default
+routeAlias: toc
 ---
 
 # Course Contents
@@ -58,13 +59,13 @@ layout: default
 <div>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-1 mb-1">Module 1 · Foundations</div>
-<div class="pl-3 py-0.5 border-l-2 border-green-500"><b>Week 1</b> — Foundations of Real-Time Systems</div>
-<div class="pl-3 py-0.5 border-l-2 border-green-500"><b>Week 2</b> — The Task Model &amp; the Utilization Bound</div>
+<Link to="week-1" class="toc-link pl-3 py-0.5"><b>Week 1</b> — Foundations of Real-Time Systems</Link>
+<Link to="week-2" class="toc-link pl-3 py-0.5"><b>Week 2</b> — The Task Model &amp; the Utilization Bound</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 2 · Real-Time Scheduling Theory</div>
-<div class="pl-3 py-0.5 border-l-2 border-green-500"><b>Week 3</b> — Rate Monotonic Scheduling</div>
-<div class="pl-3 py-0.5 border-l-2 border-green-500"><b>Week 4</b> — Earliest Deadline First; RMS vs. EDF</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 5 — Aperiodic &amp; Sporadic Servers</div>
+<Link to="week-3" class="toc-link pl-3 py-0.5"><b>Week 3</b> — Rate Monotonic Scheduling</Link>
+<Link to="week-4" class="toc-link pl-3 py-0.5"><b>Week 4</b> — Earliest Deadline First; RMS vs. EDF</Link>
+<Link to="week-5" class="toc-link pl-3 py-0.5"><b>Week 5</b> — Aperiodic &amp; Sporadic Servers</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 3 · Synchronisation &amp; IPC</div>
 <div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 6 — Queues, Semaphores, Mutexes</div>
@@ -94,7 +95,7 @@ layout: default
 <div class="mt-5 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-xs leading-relaxed">
 <b>7 modules · 16 weeks · 11 labs.</b> Each week is a self-contained deck
 (<code>weekNN.md</code>) imported into this master file — this build currently
-carries <b>Weeks 1–4</b>.
+carries <b>Weeks 1–5</b>.
 </div>
 
 </div>
@@ -105,6 +106,25 @@ carries <b>Weeks 1–4</b>.
 :root { --slidev-theme-primary: #740004ff; }
 .slidev-layout h1 { color: #003874; }
 .dark .slidev-layout h1 { color: #7ba7d9; }
+
+/* Clickable week rows in the Course Contents.
+   `border` is set explicitly to override the theme's dashed `a` underline. */
+.toc-link {
+  display: block;
+  color: inherit !important;
+  text-decoration: none !important;
+  border: 0 solid #22c55e !important;
+  border-left-width: 2px !important;
+  border-radius: 0 0.25rem 0.25rem 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.toc-link:hover {
+  background-color: rgba(34, 197, 94, 0.16);
+}
+.dark .toc-link:hover {
+  background-color: rgba(34, 197, 94, 0.22);
+}
 </style>
 
 ---
@@ -121,4 +141,8 @@ src: ./week03.md
 
 ---
 src: ./week04.md
+---
+
+---
+src: ./week05.md
 ---

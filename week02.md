@@ -11,6 +11,7 @@ info: |
 class: text-center
 transition: slide-left
 mdc: true
+routeAlias: week-2
 fonts:
   sans: Inter
   serif: Lora
@@ -369,7 +370,7 @@ The synchronous case is not just convenient — Week 3 shows it is the
 
 ---
 
-# Why $T_{\min}$ Makes Sporadic Tractable
+# Why Tₘᵢₙ Makes Sporadic Tractable
 
 <div class="mt-4 text-lg leading-relaxed">
 

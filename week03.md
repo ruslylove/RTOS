@@ -11,6 +11,7 @@ info: |
 class: text-center
 transition: slide-left
 mdc: true
+routeAlias: week-3
 fonts:
   sans: Inter
   serif: Lora
@@ -168,7 +169,11 @@ $$ T_i < T_j \;\Longrightarrow\; \pi_i > \pi_j $$
 
 <div class="px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
 <div class="font-bold text-blue-700 dark:text-blue-300">Implicit deadlines assumed</div>
-<div class="mt-2">The rule is optimal only when $D_i = T_i$. With constrained deadlines, <b>Deadline Monotonic</b> (DMS, $D_i < D_j \Rightarrow \pi_i > \pi_j$) takes over.</div>
+<div class="mt-2">
+
+The rule is optimal only when $D_i = T_i$. With constrained deadlines, <b>Deadline Monotonic</b> (DMS, $D_i < D_j \Rightarrow \pi_i > \pi_j$) takes over.
+
+</div>
 </div>
 
 </div>
@@ -196,12 +201,19 @@ The Week 1–2 task set, priorities assigned by RMS:
 </div>
 
 <div v-click class="mt-4 grid grid-cols-2 gap-4 text-sm">
+
 <div class="px-4 py-2 rounded bg-green-100 dark:bg-green-900/30">
+
 $U = 0.688 \le U_{\text{lub}}(3) = 0.780$ → <b>already guaranteed schedulable</b>
+
 </div>
+
 <div class="px-4 py-2 rounded bg-blue-50 dark:bg-blue-900/30">
+
 We will <b>verify</b> this with RTA shortly — and see the Gantt first.
+
 </div>
+
 </div>
 
 ---
@@ -276,7 +288,11 @@ in a hard-real-time environment. <i>JACM 20(1)</i>, 46–61.
 
 <div class="px-4 py-4 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
 <div class="text-base font-bold text-amber-700 dark:text-amber-300">What it doesn't mean</div>
-<div class="mt-2">RMS is NOT optimal among all algorithms. <b>EDF</b> (dynamic priority) can schedule task sets that RMS cannot — specifically when $U > U_{\text{lub}}$.</div>
+<div class="mt-2">
+
+RMS is NOT optimal among all algorithms. <b>EDF</b> (dynamic priority) can schedule task sets that RMS cannot — specifically when $U > U_{\text{lub}}$.
+
+</div>
 </div>
 
 </div>
@@ -307,20 +323,26 @@ The worst-case response time of task $\tau_i$ occurs when $\tau_i$ and **every h
 <div v-click class="mt-5 grid grid-cols-2 gap-6 text-sm">
 
 <div class="px-4 py-3 rounded bg-blue-50 dark:bg-blue-900/30">
+
 This simultaneous release is the <b>critical instant</b>. It maximises the
 interference that higher-priority tasks impose on $\tau_i$.
+
 </div>
 
 <div class="px-4 py-3 rounded bg-green-100 dark:bg-green-900/30">
+
 For a synchronous task set ($\Phi_i = 0$ for all $i$) the critical instant
 happens naturally at $t = 0$ — so we analyse the start of the hyperperiod.
+
 </div>
 
 </div>
 
 <div v-click class="mt-5 text-sm px-4 py-2 border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20">
+
 One consequence: if the system is schedulable at $t = 0$, it is schedulable <b>forever</b>.
 We never need to simulate beyond one hyperperiod.
+
 </div>
 
 ---
@@ -384,25 +406,39 @@ The utilization bound left **Set B inconclusive**: $U = 0.908 > U_{\text{lub}}(3
 <div class="mt-5 grid grid-cols-3 gap-4 text-sm">
 
 <div class="px-4 py-3 rounded-lg border-2 border-green-400 bg-green-50 dark:bg-green-900/20">
-<div class="font-bold text-green-700 dark:text-green-300">$U \le U_{\text{lub}}(n)$</div>
+<div class="font-bold text-green-700 dark:text-green-300">
+
+$U \le U_{\text{lub}}(n)$
+
+</div>
 <div class="mt-1">Sufficient → <b>done</b></div>
 </div>
 
 <div class="px-4 py-3 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
-<div class="font-bold text-amber-700 dark:text-amber-300">$U_{\text{lub}} < U \le 1$</div>
+<div class="font-bold text-amber-700 dark:text-amber-300">
+
+$U_{\text{lub}} < U \le 1$
+
+</div>
 <div class="mt-1">Inconclusive → apply <b>RTA</b></div>
 </div>
 
 <div class="px-4 py-3 rounded-lg border-2 border-red-400 bg-red-50 dark:bg-red-900/20">
-<div class="font-bold text-red-700 dark:text-red-300">$U > 1$</div>
+<div class="font-bold text-red-700 dark:text-red-300">
+
+$U > 1$
+
+</div>
 <div class="mt-1">Infeasible → <b>stop</b></div>
 </div>
 
 </div>
 
 <div v-click class="mt-6 text-sm px-4 py-2 border-l-4 border-blue-700 bg-blue-50 dark:bg-blue-900/20">
+
 Response-Time Analysis (Joseph &amp; Pandya, 1986) computes the <b>worst-case response time</b>
 $R_i$ of each task exactly, by accounting for interference from all higher-priority tasks.
+
 </div>
 
 ---
@@ -423,12 +459,20 @@ $$ R_i^{(k+1)} \;=\; C_i \;+\; \sum_{j\,\in\,\text{hp}(i)} \left\lceil \frac{R_i
 
 <div class="px-4 py-3 rounded bg-blue-50 dark:bg-blue-900/30">
 <div class="font-bold">The ceiling term</div>
-<div class="mt-2">$\lceil R_i^{(k)} / T_j \rceil$ counts how many times task τⱼ can <b>preempt</b> τᵢ during a window of length $R_i^{(k)}$. Each preemption costs $C_j$.</div>
+<div class="mt-2">
+
+$\lceil R_i^{(k)} / T_j \rceil$ counts how many times task τⱼ can <b>preempt</b> τᵢ during a window of length $R_i^{(k)}$. Each preemption costs $C_j$.
+
+</div>
 </div>
 
 <div class="px-4 py-3 rounded bg-blue-50 dark:bg-blue-900/30">
 <div class="font-bold">Convergence</div>
-<div class="mt-2">Start with $R_i^{(0)} = C_i$. Iterate until $R_i^{(k+1)} = R_i^{(k)}$ — <b>converged</b>. If $R_i^{(k+1)} > D_i$ before convergence — <b>infeasible</b>.</div>
+<div class="mt-2">
+
+Start with $R_i^{(0)} = C_i$. Iterate until $R_i^{(k+1)} = R_i^{(k)}$ — <b>converged</b>. If $R_i^{(k+1)} > D_i$ before convergence — <b>infeasible</b>.
+
+</div>
 </div>
 
 </div>
@@ -436,8 +480,10 @@ $$ R_i^{(k+1)} \;=\; C_i \;+\; \sum_{j\,\in\,\text{hp}(i)} \left\lceil \frac{R_i
 </v-clicks>
 
 <div v-click class="mt-4 text-sm px-4 py-2 border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20">
+
 The recurrence always converges if the task set is schedulable, and diverges past $D_i$ if it is not.
 The sequence is monotonically non-decreasing.
+
 </div>
 
 ---
@@ -502,7 +548,9 @@ Check: $R_2 = 4 \le D_2 = 7$. ✓
 </div>
 
 <div v-click class="mt-3 px-3 py-2 rounded bg-red-100 dark:bg-red-900/30 text-sm text-center">
+
 $R_3 = 10 > D_3 = 9$ → τ₃ <b>misses its deadline</b>. Set B is <b>not schedulable</b> under RMS.
+
 </div>
 
 ---
@@ -553,7 +601,9 @@ $U_{\text{lub}} < U \le 1$ → run RTA. Exact test — computes $R_i$ for each t
 </div>
 
 <div v-click class="mt-5 text-sm px-4 py-2 border-l-4 border-blue-700 bg-blue-50 dark:bg-blue-900/20">
+
 Always check in order 1 → 2 → 3. Most task sets never reach Level 3 — good design keeps U well below $\ln 2 \approx 0.693$.
+
 </div>
 
 ---
@@ -688,7 +738,11 @@ Three things to verify against the theory:
 
 <div class="px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/30">
 <div class="font-bold text-green-700 dark:text-green-300">3. Idle task</div>
-<div class="mt-2">Quantify the fraction of time the idle task runs. This is $1 - U$ made visible — does it match $1 - \sum C_i/T_i$?</div>
+<div class="mt-2">
+
+Quantify the fraction of time the idle task runs. This is $1 - U$ made visible — does it match $1 - \sum C_i/T_i$?
+
+</div>
 </div>
 
 </div>
@@ -713,7 +767,9 @@ layout: default
 </v-clicks>
 
 <div v-click class="mt-5 text-center text-base px-4 py-2 rounded bg-blue-100 dark:bg-blue-900/40">
+
 Next week — <b>Earliest Deadline First</b>: dynamic priorities, $U \le 1$, and why RMS still wins in practice.
+
 </div>
 
 ---

@@ -11,6 +11,7 @@ info: |
 class: text-center
 transition: slide-left
 mdc: true
+routeAlias: week-1
 fonts:
   sans: Inter
   serif: Lora
@@ -369,11 +370,17 @@ $$ U = 0.250 + 0.250 + 0.1875 = \mathbf{0.6875} \;\;(68.75\%) $$
 </div>
 
 <div v-click class="mt-4 grid grid-cols-2 gap-4 text-sm">
+
 <div class="px-4 py-2 rounded bg-green-100 dark:bg-green-900/30">
+
 $U \le 1$, so the set is <b>not</b> trivially infeasible. Good.
+
 </div>
+
 <div class="px-4 py-2 rounded bg-amber-100 dark:bg-amber-900/30">
+
 But is it <b>schedulable</b> under a real algorithm? That needs a test — Week 3.
+
 </div>
 </div>
 
