@@ -1,0 +1,401 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 10}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 10 -- Tickless Idle and Power Measurement},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{10}{Tickless Idle \& Power Measurement}{3--4}{CLO 4 \& CLO 5}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Measure} average current consumption with and without FreeRTOS tickless
+        idle.
+  \item \textbf{Configure} the built-in tickless idle
+        (\texttt{configUSE\_TICKLESS\_IDLE\,=\,1}).
+  \item \textbf{Implement} a custom \api{vPortSuppressTicksAndSleep} using the MCXN236
+        LPTMR.
+  \item \textbf{Verify} tick correction accuracy using a 1-second LED toggle and DWT
+        timing.
+  \item \textbf{Estimate} battery life improvement from tickless idle over a 24-hour
+        scenario.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 06 complete (DWT cycle counter working).
+  \item A current probe or NXP MCU-Link power measurement capability \textbf{OR} an
+        ammeter in series with the 3.3\,V supply rail.
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+\end{checklist}
+
+\begin{warnbox}
+  \textbf{Power measurement alternatives:} If no current probe is available, you can
+  use an MCU-Link Pro board's power measurement feature via MCUXpresso IDE, or a USB
+  power meter on the host port. The relative comparison (with vs.\ without tickless)
+  is more important than the absolute value.
+\end{warnbox}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{The Tick Interrupt Problem}
+
+FreeRTOS generates a SysTick interrupt every 1\,ms (at 1\,kHz tick rate). Even when all
+tasks are blocked, the CPU wakes every 1\,ms to run the tick handler --- about 100--200
+cycles of overhead, repeated 1\,000 times per second.
+
+On a system where the active task runs only 2\,ms every 500\,ms (0.4\% duty cycle), the
+tick alone dominates power consumption in the idle period.
+
+\subsection{Tickless Idle Flow}
+
+\begin{lstlisting}[style=textstyle]
+Scheduler finds all tasks blocked:
+  1. Compute xExpectedIdleTime = ticks until next task unblocks
+  2. Call vPortSuppressTicksAndSleep(xExpectedIdleTime)
+     a. Disable SysTick
+     b. Program LPTMR for xExpectedIdleTime (in 32 kHz ticks)
+     c. __WFI with SLEEPDEEP
+     d. Wake (LPTMR or other interrupt)
+     e. Read elapsed LPTMR ticks
+     f. vTaskStepTick(elapsed) -- correct the tick count
+     g. Re-enable SysTick
+  3. Resume normal scheduling
+\end{lstlisting}
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab10_tickless/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c                    <- task creation, LED init, DWT init
+    adc_task.c/.h             <- ADC sample task (500 ms period)
+    led_toggle_task.c/.h      <- 1-second LED (timing accuracy test)
+    tickless_port.c/.h        <- Part C: custom vPortSuppressTicksAndSleep
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/
+\end{lstlisting}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Baseline Current Measurement (No Tickless)}
+
+\subsection{Step 1 --- Configure with Tickless Disabled}
+
+In \file{FreeRTOSConfig.h}:
+
+\begin{lstlisting}[style=cstyle]
+#define configUSE_TICKLESS_IDLE         0
+#define configTICK_RATE_HZ              1000
+\end{lstlisting}
+
+\subsection{Step 2 --- Implement the ADC Task}
+
+\begin{lstlisting}[style=cstyle]
+void vADCTask(void *pv)
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    uint32_t sample = 0;
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(500));
+        /* Simulate ADC read: ~50 cycles */
+        sample = (sample + 37) % 4096;
+        uart_printf("[ADC] sample=%lu\r\n", sample);
+    }
+}
+\end{lstlisting}
+
+This task is active for $\sim$50 cycles (0.33\,\textmu s) every 500\,ms --- duty cycle
+$\approx$ 0.000067\%.
+
+\subsection{Step 3 --- Measure Current}
+
+Connect your ammeter or current probe in series with the board's 3.3\,V supply. Run
+for 30 seconds and record minimum and average current.
+
+\begin{checkpointbox}[~A]
+  Record average mA with \texttt{configUSE\_TICKLESS\_IDLE\,=\,0}.
+\end{checkpointbox}
+
+\begin{questionbox}[~A1]
+  The tick fires 1\,000 times per second. Each tick handler takes roughly 150 cycles.
+  What fraction of total CPU time is consumed by tick handling alone? Convert to a
+  percentage.
+\end{questionbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Built-In Tickless Idle}
+
+\subsection{Step 1 --- Enable Built-In Tickless}
+
+In \file{FreeRTOSConfig.h}:
+
+\begin{lstlisting}[style=cstyle]
+#define configUSE_TICKLESS_IDLE                  1
+#define configEXPECTED_IDLE_TIME_BEFORE_SLEEP    2
+\end{lstlisting}
+
+No other code changes are needed --- the Cortex-M33 FreeRTOS port implements
+\api{vPortSuppressTicksAndSleep} using SysTick reload.
+
+\subsection{Step 2 --- Measure Current Again}
+
+Repeat the same 30-second measurement.
+
+\begin{checkpointbox}[~B]
+  Current measurement with \texttt{configUSE\_TICKLESS\_IDLE\,=\,1}.
+\end{checkpointbox}
+
+\begin{questionbox}[~B1]
+  How much did the average current drop? Express as a percentage reduction.
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  With tickless enabled, the CPU still wakes every 500\,ms for the ADC task.
+  Calculate the total number of CPU wakeups per hour:
+  \begin{itemize}[noitemsep]
+    \item Without tickless: \underline{\hspace{2cm}} (tick + task)
+    \item With tickless:    \underline{\hspace{2cm}} (task only)
+  \end{itemize}
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Custom LPTMR Tickless Implementation}
+
+The built-in port uses SysTick (which stops in Deep Sleep on some MCU configurations).
+A better approach is to use the LPTMR, which runs from the 32.768\,kHz VBAT clock and
+survives Deep Sleep.
+
+\subsection{Step 1 --- Switch to Custom Tickless}
+
+In \file{FreeRTOSConfig.h}:
+
+\begin{lstlisting}[style=cstyle]
+#define configUSE_TICKLESS_IDLE         2   /* custom implementation */
+\end{lstlisting}
+
+\subsection{Step 2 --- Implement \texttt{vPortSuppressTicksAndSleep}}
+
+In \file{tickless\_port.c}, implement all six steps:
+
+\begin{lstlisting}[style=cstyle]
+#include "FreeRTOS.h"
+#include "task.h"
+#include "fsl_lptmr.h"
+
+#define LPTMR_CLOCK_HZ   32768UL   /* VBAT 32 kHz oscillator */
+
+void vPortSuppressTicksAndSleep(TickType_t xExpectedIdleTime)
+{
+    /* --- 1. Disable SysTick --- */
+    SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
+
+    /* --- 2. Program LPTMR --- */
+    uint32_t lptmr_ticks = (uint32_t)(
+        ((uint64_t)xExpectedIdleTime * LPTMR_CLOCK_HZ)
+        / (uint64_t)configTICK_RATE_HZ);
+
+    if (lptmr_ticks == 0) {
+        SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
+        return;
+    }
+
+    LPTMR0->CSR = 0;
+    LPTMR0->CMR = lptmr_ticks - 1;
+    LPTMR0->CSR = LPTMR_CSR_TEN_MASK | LPTMR_CSR_TIE_MASK;
+
+    /* --- 3. Enter Deep Sleep --- */
+    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+    __DSB();
+    __WFI();
+    SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+
+    /* --- 4. Stop LPTMR and read elapsed time --- */
+    LPTMR0->CSR &= ~LPTMR_CSR_TEN_MASK;
+    uint32_t elapsed_lptmr = LPTMR0->CNR;
+    LPTMR0->CSR |= LPTMR_CSR_TCF_MASK;
+
+    /* --- 5. Correct FreeRTOS tick count --- */
+    TickType_t elapsed_ticks = (TickType_t)(
+        ((uint64_t)elapsed_lptmr * configTICK_RATE_HZ)
+        / (uint64_t)LPTMR_CLOCK_HZ);
+
+    if (elapsed_ticks > 0)
+        vTaskStepTick(elapsed_ticks);
+
+    /* --- 6. Re-enable SysTick --- */
+    SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
+}
+
+void LPTMR0_IRQHandler(void)
+{
+    LPTMR0->CSR |= LPTMR_CSR_TCF_MASK;   /* clear flag -- wake only */
+}
+\end{lstlisting}
+
+\subsection{Step 3 --- Verify Timing Accuracy with LED Toggle}
+
+\begin{lstlisting}[style=cstyle]
+void vLEDTask(void *pv)
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    uint32_t toggle_count = 0;
+    DWT_Enable();
+    uint32_t prev_cycles = DWT->CYCCNT;
+
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(1000));
+        uint32_t now_cycles = DWT->CYCCNT;
+        uint32_t elapsed_ms = (now_cycles - prev_cycles) / 150000;
+        prev_cycles = now_cycles;
+
+        GPIO_TogglePinsOutput(BOARD_LED_GPIO, 1u << BOARD_LED_PIN);
+        toggle_count++;
+        uart_printf("[LED] toggle #%lu  actual period = %lu ms\r\n",
+                    toggle_count, elapsed_ms);
+    }
+}
+\end{lstlisting}
+
+Run for 60 seconds and observe whether the LED period drifts from 1\,000\,ms.
+
+\begin{checkpointbox}[~C]
+  UART from the LED task showing 60 toggle events with period values (must stay
+  within 1\,000 $\pm$ 2\,ms).
+\end{checkpointbox}
+
+\begin{questionbox}[~C1]
+  The LPTMR runs at 32.768\,kHz. The tick is 1\,kHz. What is the maximum rounding
+  error when converting between LPTMR ticks and FreeRTOS ticks? Express as $\pm$\,ms.
+\end{questionbox}
+
+\begin{questionbox}[~C2]
+  \api{vTaskStepTick} must be called with a value \textbf{less than}
+  \texttt{xExpectedIdleTime}. Why? What happens if you pass a value that is too large?
+  (Hint: look at \file{task.c} --- \api{vTaskStepTick} asserts.)
+\end{questionbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Energy Analysis}
+
+\subsection{Step 1 --- Measure Current with Custom LPTMR Implementation}
+
+Repeat the 30-second current measurement from Parts A and B.
+
+\subsection{Step 2 --- Complete the Comparison Table}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{} p{4.5cm} p{2.8cm} p{2.4cm} p{2.8cm} @{}}
+  \toprule
+  \textbf{Configuration} & \textbf{Avg.\ current (mA)} & \textbf{Wakeups/hour} &
+  \textbf{Energy (mWh/24h)} \\
+  \midrule
+  No tickless (Part A) & & 3\,600\,000 & \\
+  Built-in tickless (Part B) & & 7\,200 & \\
+  Custom LPTMR (Part D) & & 7\,200 & \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\medskip
+Energy (mWh) = average\_current (mA) $\times$ 3.3\,V $\times$ 24\,h $\div$ 1000.
+
+\begin{questionbox}[~D1]
+  Using your measured currents, how many days would a CR2032 coin cell (225\,mAh
+  capacity) power the board under each configuration?
+\end{questionbox}
+
+\begin{questionbox}[~D2]
+  \api{vTaskDelayUntil} in \texttt{vADCTask} wakes the task at exactly 500\,ms
+  boundaries. If the LPTMR rounding error from Question C1 is $\pm$0.5\,ms per sleep
+  cycle, what is the maximum accumulated timing error after 1 hour? Is this acceptable
+  for a real-time sensor system?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{5cm} p{6.5cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A current & Value and methodology description \\
+  2 & Part B current & Value (tickless = 1) \\
+  3 & Part C UART & 60 LED toggle events, period within 1\,000 $\pm$ 2\,ms \\
+  4 & Part D table & Completed comparison with measured values \\
+  5 & \file{tickless\_port.c} & Source listing \\
+  6 & Written answers & Questions A1, B1--B2, C1--C2, D1--D2 \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{6.5cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Tick interrupt power overhead & Part A current measurement \\
+  Built-in SysTick tickless idle & Part B \\
+  LPTMR-based custom tickless port & Part C \\
+  \api{vTaskStepTick} tick correction & Part C \\
+  Timing accuracy with LPTMR rounding & Part C LED toggle \\
+  Energy analysis and battery life estimation & Part D \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  FreeRTOS docs & \api{configUSE\_TICKLESS\_IDLE}, \api{vTaskStepTick},
+                  \api{vPortSuppressTicksAndSleep} \\
+  NXP MCXN236 Reference Manual & Chapter PMC, Chapter LPTMR \\
+  ARM Cortex-M33 TRM & \S B2.5 Power management, WFI instruction \\
+  NXP MCUXpresso SDK & \file{fsl\_lptmr.h} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

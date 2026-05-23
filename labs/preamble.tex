@@ -1,0 +1,174 @@
+% ── Shared preamble for all RTOS lab documents ────────────────────────────────
+% Usage: \input{../preamble}  (from each labNN/ directory)
+% ──────────────────────────────────────────────────────────────────────────────
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm, headheight=28pt]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{fontawesome5}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+% ── Colors (KMUTNB brand) ──────────────────────────────────────────────────────
+\definecolor{kmutnbBlue}{RGB}{0,56,116}
+\definecolor{kmutnbGold}{RGB}{186,146,36}
+\definecolor{lightGray}{RGB}{245,245,245}
+\definecolor{midGray}{RGB}{200,200,200}
+\definecolor{codeGray}{RGB}{248,248,248}
+\definecolor{codeFrame}{RGB}{220,220,220}
+\definecolor{tipteal}{RGB}{0,105,92}
+\definecolor{warnAmber}{RGB}{121,85,0}
+\definecolor{checkGreen}{RGB}{27,94,32}
+
+% ── Section formatting ─────────────────────────────────────────────────────────
+\titleformat{\section}
+  {\large\bfseries\color{kmutnbBlue}}
+  {\thesection.}{0.5em}{}
+  [\color{kmutnbGold}\titlerule]
+
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{kmutnbBlue}}
+  {\thesubsection.}{0.5em}{}
+
+\titleformat{\subsubsection}
+  {\small\bfseries\color{kmutnbBlue}}
+  {\thesubsubsection.}{0.5em}{}
+
+\titlespacing*{\section}{0pt}{1.4ex plus .2ex}{0.6ex plus .1ex}
+\titlespacing*{\subsection}{0pt}{1.0ex plus .2ex}{0.4ex plus .1ex}
+
+% ── Listings (C and bash) ──────────────────────────────────────────────────────
+\lstdefinestyle{cstyle}{
+  language        = C,
+  basicstyle      = \ttfamily\small,
+  keywordstyle    = \bfseries\color{kmutnbBlue},
+  commentstyle    = \itshape\color{gray},
+  stringstyle     = \color{tipteal},
+  numberstyle     = \tiny\color{midGray},
+  numbers         = left,
+  numbersep       = 6pt,
+  stepnumber      = 1,
+  backgroundcolor = \color{codeGray},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  showstringspaces= false,
+  tabsize         = 4,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.8em,
+  belowskip       = 0.8em,
+}
+
+\lstdefinestyle{bashstyle}{
+  language        = bash,
+  basicstyle      = \ttfamily\small,
+  keywordstyle    = \color{kmutnbBlue},
+  commentstyle    = \itshape\color{gray},
+  backgroundcolor = \color{black!5},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  showstringspaces= false,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.6em,
+  belowskip       = 0.6em,
+}
+
+\lstdefinestyle{textstyle}{
+  basicstyle      = \ttfamily\footnotesize,
+  backgroundcolor = \color{black!4},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{codeFrame},
+  breaklines      = true,
+  xleftmargin     = 1.5em,
+  xrightmargin    = 0.5em,
+  aboveskip       = 0.6em,
+  belowskip       = 0.6em,
+}
+
+% ── Callout boxes ──────────────────────────────────────────────────────────────
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{tipbox}[1][]{
+  enhanced, breakable,
+  colback=tipteal!8, colframe=tipteal, coltitle=white,
+  fonttitle=\bfseries\small, title={\faLightbulb\quad Tip#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{warnbox}[1][]{
+  enhanced, breakable,
+  colback=warnAmber!8, colframe=kmutnbGold, coltitle=white,
+  fonttitle=\bfseries\small, title={\faExclamationTriangle\quad Note#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{checkpointbox}[1][]{
+  enhanced,
+  colback=kmutnbBlue!6, colframe=kmutnbBlue, coltitle=white,
+  fonttitle=\bfseries\small, title={\faCheckCircle\quad Checkpoint#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+\newtcolorbox{questionbox}[1][]{
+  enhanced, breakable,
+  colback=kmutnbGold!10, colframe=kmutnbGold, coltitle=white,
+  fonttitle=\bfseries\small, title={\faQuestion\quad Question#1},
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt, arc=3pt,
+}
+
+% ── Checkbox list ──────────────────────────────────────────────────────────────
+\newlist{checklist}{itemize}{1}
+\setlist[checklist]{label=\faSquare[regular], leftmargin=1.5em, noitemsep}
+
+% ── Misc helpers ───────────────────────────────────────────────────────────────
+\newcommand{\file}[1]{\texttt{\small #1}}
+\newcommand{\api}[1]{\texttt{\small #1}}
+
+% ── Title block macro ─────────────────────────────────────────────────────────
+% Usage: \labtitle{03}{Aperiodic Servers \& Producer--Consumer}{2}{CLO 1 \& CLO 2}
+\newcommand{\labtitle}[4]{%
+  \begin{center}
+    {\color{kmutnbBlue}\rule{\linewidth}{2pt}}\\[6pt]
+    {\LARGE\bfseries\color{kmutnbBlue} Laboratory #1}\\[4pt]
+    {\large\bfseries #2}\\[2pt]
+    {\normalsize Real-Time Operating Systems \enspace\textbullet\enspace
+     M.Eng.\ ECE \enspace\textbullet\enspace KMUTNB}\\[8pt]
+    {\color{kmutnbGold}\rule{\linewidth}{1pt}}
+  \end{center}
+  \vspace{0.3cm}
+  \begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
+    \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz) \\[2pt]
+    \textbf{RTOS}           & FreeRTOS v10.6 \\[2pt]
+    \textbf{Toolchain}      & ARM GNU Toolchain (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+    \textbf{Estimated time} & #3 hours \\[2pt]
+    \textbf{CLO mapping}    & #4 \\
+  \end{tabular}
+  \vspace{0.4cm}
+}

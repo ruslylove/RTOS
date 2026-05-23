@@ -68,34 +68,34 @@ routeAlias: toc
 <Link to="week-5" class="toc-link pl-3 py-0.5"><b>Week 5</b> — Aperiodic &amp; Sporadic Servers</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 3 · Synchronisation &amp; IPC</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 6 — Queues, Semaphores, Mutexes</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 7 — Priority Inversion; PIP / PCP / SRP</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 8 — Deadlock, Livelock, Starvation</div>
+<Link to="week-6" class="toc-link pl-3 py-0.5"><b>Week 6</b> — Queues, Semaphores, Mutexes</Link>
+<Link to="week-7" class="toc-link pl-3 py-0.5"><b>Week 7</b> — Priority Inversion; PIP / PCP / SRP</Link>
+<Link to="week-8" class="toc-link pl-3 py-0.5"><b>Week 8</b> — Deadlock, Livelock, Starvation</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 4 · Timing Analysis &amp; Memory</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 9 — WCET; Interrupt Latency</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 10 — FreeRTOS Memory Management</div>
+<Link to="week-9" class="toc-link pl-3 py-0.5"><b>Week 9</b> — WCET; Interrupt Latency</Link>
+<Link to="week-10" class="toc-link pl-3 py-0.5"><b>Week 10</b> — FreeRTOS Memory Management</Link>
 
 </div>
 
 <div>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-1 mb-1">Module 5 · Advanced Hardware</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 11 — ARM TrustZone-M Security</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 12 — Multi-core AMP vs. SMP</div>
+<Link to="week-11" class="toc-link pl-3 py-0.5"><b>Week 11</b> — ARM TrustZone-M Security</Link>
+<Link to="week-12" class="toc-link pl-3 py-0.5"><b>Week 12</b> — Multi-core AMP vs. SMP</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 6 · Power &amp; Zephyr RTOS</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 13 — Low-Power RTOS; Tickless Idle</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 14 — Zephyr RTOS; Kconfig &amp; west</div>
+<Link to="week-13" class="toc-link pl-3 py-0.5"><b>Week 13</b> — Low-Power RTOS; Tickless Idle</Link>
+<Link to="week-14" class="toc-link pl-3 py-0.5"><b>Week 14</b> — Zephyr RTOS; Kconfig &amp; west</Link>
 
 <div class="font-semibold text-[#003874] dark:text-[#7ba7d9] mt-2 mb-1">Module 7 · Research &amp; Final Project</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 15 — Research Frontiers</div>
-<div class="pl-3 py-0.5 border-l-2 border-gray-300 dark:border-gray-700 opacity-55">Week 16 — Final Project Presentations</div>
+<Link to="week-15" class="toc-link pl-3 py-0.5"><b>Week 15</b> — Research Frontiers</Link>
+<Link to="week-16" class="toc-link pl-3 py-0.5"><b>Week 16</b> — Final Project Presentations</Link>
 
 <div class="mt-5 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-xs leading-relaxed">
 <b>7 modules · 16 weeks · 11 labs.</b> Each week is a self-contained deck
 (<code>weekNN.md</code>) imported into this master file — this build currently
-carries <b>Weeks 1–5</b>.
+carries <b>Weeks 1–16</b>.
 </div>
 
 </div>
@@ -145,4 +145,48 @@ src: ./week04.md
 
 ---
 src: ./week05.md
+---
+
+---
+src: ./week06.md
+---
+
+---
+src: ./week07.md
+---
+
+---
+src: ./week08.md
+---
+
+---
+src: ./week09.md
+---
+
+---
+src: ./week10.md
+---
+
+---
+src: ./week11.md
+---
+
+---
+src: ./week12.md
+---
+
+---
+src: ./week13.md
+---
+
+---
+src: ./week14.md
+---
+
+---
+src: ./week15.md
+---
+
+---
+src: ./week16.md
 ---

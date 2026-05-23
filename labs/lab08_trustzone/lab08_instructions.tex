@@ -1,0 +1,453 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 08}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 08 -- TrustZone-M: Secure/Non-Secure Partition},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{08}{TrustZone-M: Secure/Non-Secure Partition}{4--5}{CLO 5 \& CLO 6}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Configure} the SAU to partition flash and SRAM into Secure, NSC, and
+        Non-Secure regions.
+  \item \textbf{Implement} a Secure API using the CMSE
+        \texttt{\_\_attribute\_\_((cmse\_nonsecure\_entry))} annotation.
+  \item \textbf{Call} a Secure function from a Non-Secure FreeRTOS task via an NSC veneer.
+  \item \textbf{Trigger} a SecureFault by attempting a direct NS$\to$Secure SRAM access.
+  \item \textbf{Measure} NSC call overhead vs.\ a direct function call using DWT.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 07 complete (stack analysis and static allocation working).
+  \item ARM GNU Toolchain with CMSE support (\texttt{arm-none-eabi-gcc} $\geq$ 10,
+        compiled with \texttt{-mcmse}).
+  \item MCUXpresso IDE or command-line build with separate Secure and Non-Secure projects.
+  \item SEGGER J-Link or MCU-Link (J-Link firmware) for debugging SecureFault.
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{TrustZone-M Execution Model}
+
+The Cortex-M33 has two security states: \textbf{Secure (S)} and \textbf{Non-Secure (NS)}.
+The processor is always in one state. Transitions happen only through specific instructions:
+
+\begin{itemize}[noitemsep, leftmargin=*]
+  \item \textbf{NS $\to$ S:} only through the SG (Secure Gateway) instruction at an address
+        in a Non-Secure Callable (NSC) region.
+  \item \textbf{S $\to$ NS:} via \texttt{BXNS} / \texttt{BLXNS} instructions.
+\end{itemize}
+
+\subsection{Two-Project Build Structure}
+
+TrustZone-M requires two separate firmware images:
+
+\begin{lstlisting}[style=textstyle]
+Secure project (linked to 0x0000_0000)
+  - Runs first after reset
+  - Configures SAU, TrustZone peripherals
+  - Implements secure API functions
+  - Releases Non-Secure image
+
+Non-Secure project (linked to 0x0004_0000)
+  - FreeRTOS scheduler
+  - Application tasks
+  - Calls Secure API through NSC veneers
+\end{lstlisting}
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab08_trustzone/
+  secure/                        <- Secure-world project
+    Makefile
+    linker_secure.ld             <- Secure flash + SRAM regions
+    src/
+      main_secure.c              <- SAU config, Secure init, NS release
+      secure_api.c/.h            <- NSC entry functions
+      secure_api_veneer.h        <- auto-generated veneer declarations
+      startup_MCXN236_s.s        <- Secure vector table
+    cmse_implib.o                <- output: NSC import library
+  nonsecure/                     <- Non-Secure FreeRTOS project
+    Makefile
+    linker_nonsecure.ld          <- NS flash + SRAM regions
+    src/
+      main_ns.c                  <- FreeRTOS init, task creation
+      ns_tasks.c/.h              <- tasks that call Secure API
+      FreeRTOSConfig.h
+      uart.h / uart.c
+    FreeRTOS-Kernel/
+  flash_both.sh                  <- flashes S image then NS image
+  src/
+    uart.h                       <- shared UART declaration
+\end{lstlisting}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- SAU Configuration}
+
+\subsection{Step 1 --- Define the Memory Partition}
+
+Edit \file{secure/src/main\_secure.c} to configure the Security Attribution Unit:
+
+\begin{lstlisting}[style=cstyle]
+void SAU_Configure(void)
+{
+    /* Disable SAU before configuration */
+    SAU->CTRL = 0;
+
+    /* Region 0: Non-Secure flash [0x0004_0000 .. 0x001F_FFFF] */
+    SAU->RNR  = 0;
+    SAU->RBAR = 0x00040000U;
+    SAU->RLAR = (0x001FFFFFU & SAU_RLAR_LADDR_Msk) | SAU_RLAR_ENABLE_Msk;
+
+    /* Region 1: NSC region in flash [0x0003_FE00 .. 0x0003_FFFF] (512 B) */
+    SAU->RNR  = 1;
+    SAU->RBAR = 0x0003FE00U;
+    SAU->RLAR = (0x0003FFFFU & SAU_RLAR_LADDR_Msk)
+              | SAU_RLAR_NSC_Msk | SAU_RLAR_ENABLE_Msk;
+
+    /* Region 2: Non-Secure SRAM [0x2002_0000 .. 0x200F_FFFF] */
+    SAU->RNR  = 2;
+    SAU->RBAR = 0x20020000U;
+    SAU->RLAR = (0x200FFFFFU & SAU_RLAR_LADDR_Msk) | SAU_RLAR_ENABLE_Msk;
+
+    /* Enable SAU */
+    SAU->CTRL = SAU_CTRL_ENABLE_Msk;
+    __DSB();
+    __ISB();
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Verify with \texttt{TZM\_IsSecure}}
+
+Add a diagnostic function that probes whether an address is Secure:
+
+\begin{lstlisting}[style=cstyle]
+/* Secure-side only -- NS code cannot call this */
+bool TZM_IsSecure(uint32_t addr)
+{
+    for (int i = 0; i < 8; i++) {
+        SAU->RNR = i;
+        if (!(SAU->RLAR & SAU_RLAR_ENABLE_Msk)) continue;
+        uint32_t base  = SAU->RBAR & SAU_RBAR_BADDR_Msk;
+        uint32_t limit = (SAU->RLAR & SAU_RLAR_LADDR_Msk) | 0x1F;
+        if (addr >= base && addr <= limit) return false;
+    }
+    return true; /* not in any NS/NSC region -> Secure */
+}
+\end{lstlisting}
+
+Call from \file{main\_secure.c} before releasing the NS core:
+
+\begin{lstlisting}[style=cstyle]
+uart_printf("[S] 0x00010000 is %s\r\n",
+    TZM_IsSecure(0x00010000) ? "SECURE" : "NS/NSC");
+uart_printf("[S] 0x00050000 is %s\r\n",
+    TZM_IsSecure(0x00050000) ? "SECURE" : "NS/NSC");
+uart_printf("[S] 0x0003FE00 is %s (NSC)\r\n",
+    TZM_IsSecure(0x0003FE00) ? "SECURE" : "NS/NSC");
+\end{lstlisting}
+
+\begin{checkpointbox}[~A]
+  UART output showing correct Secure/NS attribution for the three test addresses.
+\end{checkpointbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Implement and Call Secure API}
+
+\subsection{Step 1 --- Write the Secure API}
+
+In \file{secure/src/secure\_api.c}:
+
+\begin{lstlisting}[style=cstyle]
+#include <arm_cmse.h>
+#include "secure_api.h"
+
+/* Secure ADC value -- NS world must not read this directly */
+static volatile int32_t s_last_adc_value = 0;
+
+/* NSC entry function -- callable from Non-Secure world */
+__attribute__((cmse_nonsecure_entry))
+int32_t Secure_ADC_Read(void)
+{
+    s_last_adc_value = (s_last_adc_value + 37) % 4096;
+    return s_last_adc_value;
+}
+
+__attribute__((cmse_nonsecure_entry))
+void Secure_ADC_Init(void)
+{
+    uart_printf("[S] Secure_ADC_Init called from NS world\r\n");
+    s_last_adc_value = 0;
+}
+\end{lstlisting}
+
+In \file{secure/src/secure\_api.h}:
+
+\begin{lstlisting}[style=cstyle]
+#ifndef SECURE_API_H
+#define SECURE_API_H
+#include <stdint.h>
+
+/* Declarations for NS world -- placed in CMSE import library */
+int32_t Secure_ADC_Read(void);
+void    Secure_ADC_Init(void);
+
+#endif /* SECURE_API_H */
+\end{lstlisting}
+
+\subsection{Step 2 --- Build the Secure Image and Generate the Import Library}
+
+\begin{lstlisting}[style=bashstyle]
+cd secure
+make
+# Output: secure.elf  +  cmse_implib.o (NSC veneer import library)
+\end{lstlisting}
+
+The linker flags \texttt{-Wl,\allowbreak--cmse-implib -Wl,\allowbreak--out-implib=cmse\_implib.o}
+generate the import library containing SG stubs.
+
+Verify SG stubs appear in the map file:
+
+\begin{lstlisting}[style=bashstyle]
+grep ".gnu.sgstubs" secure.map
+\end{lstlisting}
+
+Expected output:
+\begin{lstlisting}[style=textstyle]
+.gnu.sgstubs   0x0003fe00   0x10   Secure_ADC_Read
+.gnu.sgstubs   0x0003fe10   0x08   Secure_ADC_Init
+\end{lstlisting}
+
+\begin{checkpointbox}[~B1]
+  Map file excerpt showing SG stubs located in the NSC region (0x0003FE00).
+\end{checkpointbox}
+
+\subsection{Step 3 --- Call from Non-Secure FreeRTOS Task}
+
+Copy \file{cmse\_implib.o} to \file{nonsecure/}. In \file{nonsecure/src/ns\_tasks.c}:
+
+\begin{lstlisting}[style=cstyle]
+#include "secure_api.h"
+
+void vSensorTask(void *pv)
+{
+    Secure_ADC_Init();
+    for (;;) {
+        int32_t value = Secure_ADC_Read();
+        uart_printf("[NS] ADC value = %ld\r\n", value);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+}
+\end{lstlisting}
+
+Build the NS image (links against \file{cmse\_implib.o}):
+
+\begin{lstlisting}[style=bashstyle]
+cd nonsecure
+make
+\end{lstlisting}
+
+\subsection{Step 4 --- Flash and Run}
+
+\begin{lstlisting}[style=bashstyle]
+./flash_both.sh
+# Flashes secure.bin to 0x0000_0000, then nonsecure.bin to 0x0004_0000
+\end{lstlisting}
+
+Expected UART output:
+
+\begin{lstlisting}[style=textstyle]
+[S] SAU configured
+[S] 0x00010000 is SECURE
+[S] 0x00050000 is NS/NSC
+[S] Releasing Non-Secure image at 0x00040000
+[NS] starting FreeRTOS...
+[S] Secure_ADC_Init called from NS world
+[NS] ADC value = 37
+[NS] ADC value = 74
+\end{lstlisting}
+
+\begin{checkpointbox}[~B2]
+  UART output showing alternating \texttt{[S]} init and \texttt{[NS]} sensor values.
+\end{checkpointbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Trigger a SecureFault}
+
+\subsection{Step 1 --- Direct NS$\to$Secure SRAM Access}
+
+In \texttt{vSensorTask}, add a deliberate access to Secure SRAM (this will fault):
+
+\begin{lstlisting}[style=cstyle]
+/* Attempting to read Secure SRAM from NS world -- should SecureFault */
+volatile uint32_t *secure_ptr = (volatile uint32_t *)0x20010000U;
+uint32_t val = *secure_ptr;   /* <- triggers SecureFault */
+uart_printf("[NS] should never print: %lu\r\n", val);
+\end{lstlisting}
+
+\subsection{Step 2 --- Implement the SecureFault Handler}
+
+In \file{nonsecure/src/main\_ns.c}:
+
+\begin{lstlisting}[style=cstyle]
+void SecureFault_Handler(void)
+{
+    uart_printf("[NS] !!! SecureFault !!!\r\n");
+    uart_printf("[NS] SFSR = 0x%08lX\r\n", SAU->SFSR);
+    uart_printf("[NS] SFAR = 0x%08lX\r\n", SAU->SFAR);
+    for (;;) {}
+}
+\end{lstlisting}
+
+\begin{checkpointbox}[~C]
+  UART showing \texttt{!!! SecureFault !!!} with SFSR/SFAR values.
+  Note the faulting address (0x20010000) reported in SFAR.
+\end{checkpointbox}
+
+\begin{questionbox}[~C1]
+  The SecureFault is raised on the \textbf{NS} side (not the Secure side). Explain
+  why --- which hardware unit detects the violation and in which security state does
+  the fault handler run?
+\end{questionbox}
+
+\begin{questionbox}[~C2]
+  The SFSR (Secure Fault Status Register) has several bits. Look up the meaning of
+  bit 1 (\texttt{SFARVALID}) and bit 0 (\texttt{INVEP}). Which bit is set in your
+  fault? What does it indicate?
+\end{questionbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Measure NSC Call Overhead}
+
+\subsection{Step 1 --- Benchmark NSC vs.\ Direct Call}
+
+Use the DWT cycle counter (Lab 06) to compare NSC and direct call latency:
+
+\begin{lstlisting}[style=cstyle]
+void vBenchmarkTask(void *pv)
+{
+    DWT_Enable();
+    uint32_t nsc_cycles, direct_cycles;
+
+    /* NSC call overhead */
+    DWT_START();
+    volatile int32_t v1 = Secure_ADC_Read();   /* crosses S/NS boundary */
+    DWT_STOP();
+    nsc_cycles = _dwt_elapsed;
+
+    /* Direct function call (NS-only function, same logic) */
+    DWT_START();
+    volatile int32_t v2 = ns_dummy_adc_read();
+    DWT_STOP();
+    direct_cycles = _dwt_elapsed;
+
+    uart_printf("[BENCH] NSC: %lu cycles  Direct: %lu cycles  Overhead: %lu\r\n",
+                nsc_cycles, direct_cycles, nsc_cycles - direct_cycles);
+    vTaskDelete(NULL);
+}
+\end{lstlisting}
+
+\begin{checkpointbox}[~D]
+  Terminal output showing NSC and direct call cycle counts with computed overhead.
+\end{checkpointbox}
+
+\begin{questionbox}[~D1]
+  The NSC call overhead includes \texttt{BLXNS} + SG instruction + context save.
+  At 150\,MHz, convert the overhead cycles to nanoseconds. Is this acceptable for
+  a 1\,kHz control loop?
+\end{questionbox}
+
+\begin{questionbox}[~D2]
+  FreeRTOS-M33 (NS kernel) allocates a ``Secure context'' per NS task that calls NSC
+  functions. Where is this context stored, and why is it needed?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A UART & SAU probe output --- 3 addresses \\
+  2 & Part B1 map excerpt & SG stubs in NSC region \\
+  3 & Part B2 UART & Alternating \texttt{[S]} init and \texttt{[NS]} sensor values \\
+  4 & Part C UART & SecureFault with SFSR/SFAR values \\
+  5 & Part D UART & NSC vs.\ direct call cycle counts \\
+  6 & Written answers & Questions C1--C2, D1--D2 \\
+  7 & Source listings & \file{secure\_api.c} and \file{ns\_tasks.c} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  SAU region configuration & Part A \\
+  Security attribution verification & Part A \texttt{TZM\_IsSecure} \\
+  CMSE \texttt{cmse\_nonsecure\_entry} + SG veneer & Part B \\
+  NSC import library and BLXNS call & Part B \\
+  SecureFault on illegal NS$\to$S access & Part C \\
+  SFSR / SFAR fault diagnosis & Part C \\
+  NSC call overhead measurement & Part D \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  ARM Cortex-M33 TRM & \S B9 TrustZone-M, \S B2.3 SecureFault \\
+  NXP AN13814 & TrustZone-M on MCXN236 \\
+  ARM CMSE specification & \texttt{cmse\_nonsecure\_entry}, \texttt{BLXNS} \\
+  GCC ARM options & \texttt{-mcmse}, \texttt{--cmse-implib}, \texttt{--out-implib} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

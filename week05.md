@@ -230,6 +230,26 @@ The server has a **bounded** utilization $U_s = C_s / T_s$. To the periodic task
 </div>
 
 ---
+
+# Aperiodic Server Comparison
+
+<div class="my-3 flex justify-center">
+<img src="./figures/aperiodic_servers.svg" class="w-full max-w-5xl"/>
+</div>
+
+<div class="grid grid-cols-3 gap-3 text-xs mt-1">
+<div class="px-3 py-2 rounded bg-amber-50 dark:bg-amber-900/30">
+<b>PS:</b> budget discarded if no request at poll point — aperiodic waits until next period boundary (worst-case wait ≈ Tₛ).
+</div>
+<div class="px-3 py-2 rounded bg-green-50 dark:bg-green-900/30">
+<b>DS:</b> budget held until used — aperiodic served immediately when budget available. Best response, but RMS analysis is harder.
+</div>
+<div class="px-3 py-2 rounded bg-blue-50 dark:bg-blue-900/30">
+<b>SS:</b> replenishes Tₛ after consumption — immediate service like DS, with RMS-compatible schedulability analysis.
+</div>
+</div>
+
+---
 layout: section
 ---
 
