@@ -1,0 +1,473 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 03}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 03 -- Aperiodic Servers \& Producer--Consumer Pipeline},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{03}{Aperiodic Servers \& Producer--Consumer Pipeline}{3--4}{CLO 2 \& CLO 3}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item Implement a \textbf{deferred-interrupt handler} that moves ISR work into a task context.
+  \item Implement a \textbf{Polling Server} pattern using a FreeRTOS software timer and a
+        request queue.
+  \item Measure \textbf{aperiodic response time} under a periodic background load and compare
+        Polling Server vs.\ direct task notification.
+  \item Build a \textbf{two-producer, one-consumer} queue pipeline and observe queue
+        saturation.
+  \item Use an \textbf{event group} to coordinate a multi-condition synchronisation scenario.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 02 complete --- you can build, flash, and observe a FreeRTOS application.
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+  \item FRDM-MCXN236 board connected via MCU-LINK USB.
+  \item SEGGER SystemView installed (needed for Part D).
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+The course Task Model assumes \textbf{periodic} tasks with known execution times. Real systems
+also receive \textbf{aperiodic} events (button presses, UART interrupts, sensor alerts) that
+must be handled without jeopardising periodic task deadlines.
+
+Two strategies are in scope for this lab:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{3.0cm} p{3.5cm} p{3.5cm} p{3.5cm} @{}}
+  \toprule
+  \textbf{Strategy} & \textbf{Mechanism} & \textbf{Response time} & \textbf{Periodic impact} \\
+  \midrule
+  Deferred interrupt &
+    ISR gives semaphore $\to$ task unblocks immediately &
+    Very low &
+    Depends on handler task priority \\
+  Polling Server &
+    Software timer wakes a service task on a fixed budget and period &
+    Up to one server period &
+    Bounded --- server is treated as a periodic task \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab03_aperiodic_server/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c                 <- creates all tasks and kernel objects
+    periodic_tasks.c/.h    <- tau1 (100 ms), tau2 (200 ms) background load
+    aperiodic_handler.c/.h <- deferred ISR task + Polling Server task
+    producer_consumer.c/.h <- two-producer / one-consumer pipeline (Part C)
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/         <- cloned by `make setup'
+\end{lstlisting}
+
+\subsection{Task and Kernel Object Map}
+
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{} p{4.5cm} p{3.5cm} p{5.5cm} @{}}
+  \toprule
+  \textbf{Object} & \textbf{Type} & \textbf{Notes} \\
+  \midrule
+  \texttt{vPeriodic1Task}        & Task prio~3, T=100\,ms & Background periodic load \\
+  \texttt{vPeriodic2Task}        & Task prio~2, T=200\,ms & Background periodic load \\
+  \texttt{vAperiodicHandlerTask} & Task prio~4             & Deferred ISR handler (Part A) \\
+  \texttt{vPollingServerTask}    & Task prio~3             & Budget-limited service task (Part B) \\
+  \texttt{xAperiodicSem}         & Binary semaphore        & ISR $\to$ handler signal \\
+  \texttt{xRequestQueue}         & Queue depth 4           & Polling Server request queue \\
+  \texttt{vSensor1Task}          & Task prio~3, T=100\,ms & Producer 1 (Part C) \\
+  \texttt{vSensor2Task}          & Task prio~2, T=200\,ms & Producer 2 (Part C) \\
+  \texttt{vLoggerTask}           & Task prio~1             & Consumer (Part C) \\
+  \texttt{xPipelineQueue}        & Queue depth 10          & Sensor $\to$ Logger (Part C) \\
+  \texttt{xPipelineEvents}       & Event group             & \texttt{DATA\_READY} + \texttt{ALARM} bits (Part C) \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Deferred Interrupt Handler}
+
+\subsection{Step 1 --- Wire the Button ISR}
+
+The FRDM-MCXN236 has a user button on GPIO P0\_23. The ISR is already registered in
+\file{main.c}; your task is to implement the handler.
+
+In \file{aperiodic\_handler.c}, implement:
+
+\begin{lstlisting}[style=cstyle]
+/* ISR -- keep it minimal: signal and return */
+void GPIO0_IRQHandler(void)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23);
+    xSemaphoreGiveFromISR(xAperiodicSem, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+/* Handler task -- runs at prio 4, higher than all periodic tasks */
+void vAperiodicHandlerTask(void *pv)
+{
+    uint32_t count = 0;
+    for (;;) {
+        xSemaphoreTake(xAperiodicSem, portMAX_DELAY);
+        count++;
+        uart_printf("[ASYNC] button press #%lu -- handled in task context\r\n",
+                    count);
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Build and Test}
+
+\begin{lstlisting}[style=bashstyle]
+cd labs/lab03_aperiodic_server
+make setup    # first time only
+make
+make flash
+\end{lstlisting}
+
+Press the user button several times and observe the terminal. Each press should appear as
+an \texttt{[ASYNC]} line between the \texttt{[P1]} and \texttt{[P2]} periodic lines.
+
+\begin{checkpointbox}[~A]
+  Terminal showing at least 3 button presses interleaved with periodic output,
+  with no missed presses.
+\end{checkpointbox}
+
+\begin{questionbox}[~A1]
+  Press the button rapidly 5 times in under 100\,ms. Do any presses get lost? Why or
+  why not?
+  (\emph{Hint:} \texttt{xAperiodicSem} is a binary semaphore. What happens to the second
+  give if the first has not been taken yet?)
+\end{questionbox}
+
+\begin{questionbox}[~A2]
+  The handler task runs at priority 4, above all periodic tasks. What is the cost of this
+  choice? When would you set the handler priority \emph{below} the periodic tasks?
+\end{questionbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Polling Server}
+
+\subsection{Step 1 --- Implement the Server}
+
+A Polling Server is a periodic task with a fixed budget $B_s$. It checks a request queue
+and drains up to $B_s$\,ms of work per activation.
+
+In \file{aperiodic\_handler.c}:
+
+\begin{lstlisting}[style=cstyle]
+#define POLLING_SERVER_BUDGET_MS  10   /* max service per period */
+#define POLLING_SERVER_PERIOD_MS  50   /* Ts */
+
+void vPollingServerTask(void *pv)
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(POLLING_SERVER_PERIOD_MS));
+
+        TickType_t budget_start = xTaskGetTickCount();
+        AperiodicRequest_t req;
+
+        while ((xTaskGetTickCount() - budget_start) <
+               pdMS_TO_TICKS(POLLING_SERVER_BUDGET_MS))
+        {
+            if (xQueueReceive(xRequestQueue, &req, 0) != pdTRUE)
+                break;
+            uart_printf("[PS] served request type=%d at t=%lu ms\r\n",
+                        req.type, xTaskGetTickCount());
+        }
+    }
+}
+\end{lstlisting}
+
+\begin{warnbox}
+  The Polling Server is parameterised as a periodic task with $C_i = B_s$,
+  $T_i = T_s$ for schedulability analysis. Add it to the utilisation calculation ---
+  does the total $U$ stay below $\ln 2$?
+\end{warnbox}
+
+\subsection{Step 2 --- Submit Requests from an ISR}
+
+Wire the button ISR to enqueue a request instead of giving a semaphore
+(switch \file{main.c} to \texttt{\#define LAB\_PART POLLING\_SERVER}):
+
+\begin{lstlisting}[style=cstyle]
+void GPIO0_IRQHandler(void)
+{
+    BaseType_t xHPTW = pdFALSE;
+    GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23);
+    AperiodicRequest_t req = { .type = 1,
+                               .timestamp = xTaskGetTickCountFromISR() };
+    xQueueSendFromISR(xRequestQueue, &req, &xHPTW);
+    portYIELD_FROM_ISR(xHPTW);
+}
+\end{lstlisting}
+
+\subsection{Step 3 --- Observe and Measure}
+
+Press the button and note the time between the press (timestamp logged in the ISR) and
+the \texttt{[PS] served} line.
+
+\begin{checkpointbox}[~B]
+  Terminal output with at least 5 requests served, annotated with arrival time and
+  service time.
+\end{checkpointbox}
+
+\begin{questionbox}[~B1]
+  What is the worst-case aperiodic response time of the Polling Server in terms of $T_s$?
+  With $T_s = 50$\,ms, what is the maximum expected wait? Does your measured data agree?
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  You pressed the button 8 times quickly. The queue depth is 4. What happened to the
+  other 4 requests? What would change if you used \texttt{xQueueSendFromISR} with
+  \texttt{portMAX\_DELAY}?
+\end{questionbox}
+
+\begin{questionbox}[~B3]
+  Compare the Polling Server with the direct deferred handler from Part~A.
+  Fill in this table from your observations:
+
+  \smallskip
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{@{} p{4.5cm} p{3.5cm} p{3.5cm} @{}}
+    \toprule
+    \textbf{Metric} & \textbf{Deferred handler} & \textbf{Polling Server} \\
+    \midrule
+    Response time (typical) & & \\
+    Response time (worst case) & & \\
+    Effect on periodic tasks at peak load & & \\
+    Analysis complexity & & \\
+    \bottomrule
+  \end{tabular}
+  \renewcommand{\arraystretch}{1}
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Two-Producer, One-Consumer Pipeline}
+
+\subsection{Step 1 --- Build the Pipeline}
+
+Implement in \file{producer\_consumer.c}:
+
+\begin{lstlisting}[style=cstyle]
+typedef struct {
+    uint8_t  sensor_id;
+    int16_t  value;
+    uint32_t timestamp;
+} SensorReading_t;
+
+void vSensor1Task(void *pv)   /* T=100 ms, prio 3 */
+{
+    static int16_t raw = 0;
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(100));
+        raw = (raw + 7) % 1000;
+        SensorReading_t r = { .sensor_id = 1, .value = raw,
+                              .timestamp = xTaskGetTickCount() };
+        if (xQueueSend(xPipelineQueue, &r, 0) != pdTRUE)
+            uart_printf("[S1] queue full -- dropped!\r\n");
+    }
+}
+
+void vSensor2Task(void *pv)   /* T=200 ms, prio 2 */
+{
+    static int16_t raw = 500;
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(200));
+        raw = (raw + 13) % 1000;
+        SensorReading_t r = { .sensor_id = 2, .value = raw,
+                              .timestamp = xTaskGetTickCount() };
+        xQueueSend(xPipelineQueue, &r, 0);
+    }
+}
+
+void vLoggerTask(void *pv)    /* prio 1 -- lowest */
+{
+    static uint32_t count = 0;
+    SensorReading_t r;
+    for (;;) {
+        xQueueReceive(xPipelineQueue, &r, portMAX_DELAY);
+        count++;
+        uart_printf("[LOG] #%lu  sensor=%d  val=%d  t=%lu ms\r\n",
+                    count, r.sensor_id, r.value, r.timestamp);
+        if ((count % 10) == 0)
+            xEventGroupSetBits(xPipelineEvents, BIT_DATA_READY);
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Add Event Group Coordination}
+
+A fourth task waits for \texttt{BIT\_DATA\_READY} (every 10 items processed) OR
+\texttt{BIT\_ALARM} (value $> 800$):
+
+\begin{lstlisting}[style=cstyle]
+#define BIT_DATA_READY   (1 << 0)
+#define BIT_ALARM        (1 << 1)
+
+void vMonitorTask(void *pv)   /* prio 2 */
+{
+    for (;;) {
+        EventBits_t bits = xEventGroupWaitBits(
+            xPipelineEvents,
+            BIT_DATA_READY | BIT_ALARM,
+            pdTRUE,   /* clear on exit */
+            pdFALSE,  /* OR -- either bit suffices */
+            portMAX_DELAY);
+        if (bits & BIT_DATA_READY)
+            uart_printf("[MON] 10-item batch complete\r\n");
+        if (bits & BIT_ALARM)
+            uart_printf("[MON] ALARM: value exceeded threshold\r\n");
+    }
+}
+\end{lstlisting}
+
+Set \texttt{BIT\_ALARM} inside \texttt{vLoggerTask} when \texttt{r.value > 800}.
+
+\begin{checkpointbox}[~C]
+  Terminal showing both \texttt{[MON] 10-item batch} and \texttt{[MON] ALARM} lines
+  with correct timing.
+\end{checkpointbox}
+
+\begin{questionbox}[~C1]
+  Why is the event group AND (\texttt{pdTRUE}) vs.\ OR (\texttt{pdFALSE}) distinction
+  important here? What would happen if you used AND for this monitor task?
+\end{questionbox}
+
+\begin{questionbox}[~C2]
+  Use \texttt{uxQueueMessagesWaiting(xPipelineQueue)} inside \texttt{vLoggerTask} and
+  print it every 10 items. Does the queue ever have more than 1 item waiting? Explain
+  why or why not at current production vs.\ consumption rates.
+\end{questionbox}
+
+\begin{questionbox}[~C3]
+  Artificially slow down \texttt{vLoggerTask} with
+  \texttt{vTaskDelay(pdMS\_TO\_TICKS(150))} after each print. Watch
+  \texttt{[S1] queue full} messages appear. What is the queue high-water mark just
+  before the first drop? How does this inform the minimum required queue depth for a
+  2-second burst?
+\end{questionbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- SystemView Trace}
+
+Rebuild without the slowing \texttt{vTaskDelay} from Question~C3. Capture a SystemView
+trace of the full system (all tasks running).
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item Open SystemView $\to$ Start Recording.
+  \item Run for at least 5 seconds.
+  \item Stop recording and export the trace.
+\end{enumerate}
+
+In the trace identify and annotate:
+\begin{itemize}[noitemsep, leftmargin=*]
+  \item A context switch from \texttt{vLoggerTask} to \texttt{vSensor1Task} triggered
+        by timer expiry.
+  \item A \texttt{xQueueSend} call inside \texttt{vSensor1Task} that directly unblocks
+        \texttt{vLoggerTask}.
+  \item The \texttt{[MON]} task sleeping until the event group fires.
+\end{itemize}
+
+\begin{checkpointbox}[~D]
+  Annotated screenshot of the SystemView timeline.
+\end{checkpointbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A terminal capture   & 3+ button presses interleaved with periodic output \\
+  2 & Part B comparison table   & Question~B3 with measured values \\
+  3 & Part C terminal capture   & Both event group triggers visible \\
+  4 & Part D SystemView screenshot & Annotated timeline \\
+  5 & Written answers           & Questions A1--A2, B1--B3, C1--C3 \\
+  6 & \file{FreeRTOSConfig.h}   & Utilisation calculation comment including Polling Server \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Introduced}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Deferred interrupt handler pattern         & Part A \\
+  Binary semaphore for ISR$\to$task signalling & Part A \\
+  Polling Server budget and period           & Part B \\
+  Aperiodic response time under periodic load & Parts A \& B \\
+  Multi-producer queue pipeline              & Part C \\
+  Queue saturation and flow control          & Part C \\
+  Event group AND vs.\ OR synchronisation    & Part C \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Barry, \textit{Mastering the FreeRTOS Kernel} &
+    Ch.~6 (semaphores), Ch.~8 (event groups) \\
+  Buttazzo, \textit{Hard Real-Time Computing Systems} &
+    Ch.~5 (aperiodic task scheduling) \\
+  FreeRTOS docs &
+    \texttt{xSemaphoreGiveFromISR}, \texttt{xQueueSendFromISR},
+    \texttt{xEventGroupSetBits}, \texttt{xEventGroupWaitBits} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

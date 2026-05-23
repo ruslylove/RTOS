@@ -1,0 +1,407 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 07}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 07 -- Stack Overflow Detection \& Memory Analysis},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{07}{Stack Overflow Detection \& Memory Analysis}{2--3}{CLO 4 \& CLO 5}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Induce} a stack overflow in a FreeRTOS task using a recursive function.
+  \item \textbf{Detect} the overflow using \texttt{configCHECK\_FOR\_STACK\_OVERFLOW = 2}
+        before corruption spreads.
+  \item \textbf{Right-size} task stacks using \texttt{uxTaskGetStackHighWaterMark}.
+  \item \textbf{Analyse} total heap usage with \texttt{xPortGetFreeHeapSize} and the
+        linker map file.
+  \item \textbf{Convert} one task to static allocation and verify heap usage drops.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 03 producer-consumer system (used as the baseline in Part~C).
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+  \item A text editor with hex search (for observing the 0xA5 pattern).
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{Stack Overflow Consequences}
+
+Every FreeRTOS task has its own stack allocated from the heap. If a task's stack grows
+beyond its allocation, it silently overwrites the adjacent heap block --- which may
+contain another task's TCB, stack, or queue buffer. The crash typically manifests as a
+hard fault far from the actual cause.
+
+FreeRTOS provides two overflow detection mechanisms:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{2cm} p{5cm} p{3cm} @{}}
+  \toprule
+  \textbf{Method} & \textbf{Config value} & \textbf{How it works} & \textbf{Catches} \\
+  \midrule
+  1 & \texttt{1} & Check SP $<$ stack base at each context switch &
+    Overflows that leave SP below base \\
+  2 & \texttt{2} & Fill entire stack with 0xA5 at creation; check last 20 bytes at each switch &
+    Most overflows, including those that recover \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab07_stack_overflow/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c                 <- task creation
+    overflow_demo.c/.h     <- Part A: intentional overflow
+    stack_sizing.c/.h      <- Part B: sizing the Lab 03 pipeline
+    static_alloc.c/.h      <- Part C: static allocation
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/
+\end{lstlisting}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Induce and Detect a Stack Overflow}
+
+\subsection{Step 1 --- Create a Task with a Small Stack}
+
+\begin{lstlisting}[style=cstyle]
+/* overflow_demo.c */
+
+/* Each call adds ~64 bytes to the stack */
+static uint32_t recursive_sum(uint32_t n)
+{
+    uint32_t local_buffer[8];
+    for (int i = 0; i < 8; i++) local_buffer[i] = i + n;
+    if (n == 0) return 0;
+    return local_buffer[0] + recursive_sum(n - 1);
+}
+
+void vOverflowTask(void *pv)
+{
+    for (;;) {
+        uart_printf("[OVF] starting recursive_sum(60)...\r\n");
+        uint32_t result = recursive_sum(60);
+        uart_printf("[OVF] result = %lu (you should never see this)\r\n", result);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+\end{lstlisting}
+
+In \file{main.c}, create the task with a very small stack (64 words = 256 bytes):
+
+\begin{lstlisting}[style=cstyle]
+xTaskCreate(vOverflowTask, "Overflow", 64, NULL, 2, NULL);
+\end{lstlisting}
+
+\subsection{Step 2 --- First Run: No Detection}
+
+Build and flash with detection \textbf{disabled}:
+
+\begin{lstlisting}[style=cstyle]
+/* FreeRTOSConfig.h */
+#define configCHECK_FOR_STACK_OVERFLOW  0
+\end{lstlisting}
+
+Observe the terminal. The overflow will likely cause a HardFault or garbled output, but
+no useful diagnostic message.
+
+\begin{checkpointbox}[~A1]
+  UART capture showing the crash --- note that the crash is non-deterministic and may
+  look different each run.
+\end{checkpointbox}
+
+\subsection{Step 3 --- Enable Overflow Detection}
+
+\begin{lstlisting}[style=cstyle]
+/* FreeRTOSConfig.h */
+#define configCHECK_FOR_STACK_OVERFLOW  2
+\end{lstlisting}
+
+Implement the hook in \file{overflow\_demo.c}:
+
+\begin{lstlisting}[style=cstyle]
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+    taskDISABLE_INTERRUPTS();
+    uart_printf("\r\n!!! STACK OVERFLOW in task: %s !!!\r\n", pcTaskName);
+    for (;;) {}   /* halt so we can read the message */
+}
+\end{lstlisting}
+
+Rebuild and flash.
+
+\begin{checkpointbox}[~A2]
+  UART capture showing \texttt{!!! STACK OVERFLOW in task: Overflow !!!}
+\end{checkpointbox}
+
+\begin{questionbox}[~A1]
+  With \texttt{configCHECK\_FOR\_STACK\_OVERFLOW = 2}, the check only fires at context
+  switch time --- not at the exact moment of overflow. Is there any scenario where the
+  overflow happens, the stack ``heals'' before the switch, and the hook does NOT fire?
+  When would you use Method~1 vs.\ Method~2?
+\end{questionbox}
+
+\begin{questionbox}[~A2]
+  The overflow hook receives \texttt{pcTaskName}. Can you always trust this name to
+  identify the crashed task? (Hint: what was overwritten just before the hook was called?)
+\end{questionbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Right-Sizing Stack Depths}
+
+\subsection{Step 1 --- Find the High-Water Mark}
+
+Increase the overflow task's stack to 512 words so it can run safely:
+
+\begin{lstlisting}[style=cstyle]
+xTaskCreate(vOverflowTask, "Overflow", 512, NULL, 2, NULL);
+\end{lstlisting}
+
+After at least 30 seconds, read the high-water mark:
+
+\begin{lstlisting}[style=cstyle]
+void vStackReportTask(void *pv)
+{
+    vTaskDelay(pdMS_TO_TICKS(30000));
+    uart_printf("\r\n=== Stack High-Water Mark Report ===\r\n");
+    TaskHandle_t handles[] = { xOverflowHandle, xSensor1Handle, xLoggerHandle };
+    const char  *names[]   = { "Overflow", "Sensor1", "Logger" };
+    for (int i = 0; i < 3; i++) {
+        UBaseType_t hwm = uxTaskGetStackHighWaterMark(handles[i]);
+        uart_printf("  %-16s  HWM = %u words remaining\r\n", names[i], hwm);
+    }
+    uart_printf("Free heap: %u bytes\r\n", xPortGetFreeHeapSize());
+    vTaskDelete(NULL);
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Compute the Right-Sized Stack}
+
+For each task, apply the formula:
+\[
+  \text{right\_sized} = (\text{allocated} - \text{HWM}) + \lceil (\text{allocated} - \text{HWM}) \times 0.20 \rceil
+\]
+
+\subsection{Step 3 --- Apply to the Lab 03 Pipeline}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{3.5cm} c c c c @{}}
+  \toprule
+  \textbf{Task} & \textbf{Alloc'd (words)} & \textbf{HWM remaining} &
+    \textbf{Min used} & \textbf{Right-sized (+20\%)} \\
+  \midrule
+  \texttt{vSensor1Task}  & & & & \\
+  \texttt{vSensor2Task}  & & & & \\
+  \texttt{vLoggerTask}   & & & & \\
+  \texttt{vMonitorTask}  & & & & \\
+  \texttt{vOverflowTask} & & & & \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\begin{checkpointbox}[~B]
+  Filled-in high-water-mark table from UART output.
+\end{checkpointbox}
+
+\begin{questionbox}[~B1]
+  \texttt{uxTaskGetStackHighWaterMark} returns 4 for one of your tasks. What does this
+  mean? Is this task safe to leave running? What is your next step?
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  The formula adds 20\% headroom. What real-world factors could cause a task to use more
+  stack in production than was observed in the lab? Name at least three.
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Heap Analysis}
+
+\subsection{Step 1 --- Total Heap Usage}
+
+\begin{lstlisting}[style=cstyle]
+/* In main.c, before vTaskStartScheduler: */
+uart_printf("Heap free before scheduler: %u bytes\r\n",
+            xPortGetFreeHeapSize());
+uart_printf("Heap minimum ever free:     %u bytes\r\n",
+            xPortGetMinimumEverFreeHeapSize());
+\end{lstlisting}
+
+\subsection{Step 2 --- Linker Map Analysis}
+
+Build with map output enabled:
+
+\begin{lstlisting}[style=bashstyle]
+make MAP=1
+\end{lstlisting}
+
+Open \file{lab07.map} and locate the memory layout. Fill in this table:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{2.5cm} p{2cm} p{1.8cm} p{5.5cm} @{}}
+  \toprule
+  \textbf{Section} & \textbf{Size (bytes)} & \textbf{Location} & \textbf{Contains} \\
+  \midrule
+  \texttt{.text}       & & Flash & Code, string literals, ISR vectors \\
+  \texttt{.rodata}     & & Flash & \texttt{const} data \\
+  \texttt{.data}       & & SRAM  & Initialised globals \\
+  \texttt{.bss}        & & SRAM  & Zero-init globals (incl.\ \texttt{ucHeap}) \\
+  Stack (MSP)          & & SRAM  & Main stack (before scheduler) \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\begin{checkpointbox}[~C]
+  Filled-in linker map section size table.
+\end{checkpointbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Static Allocation}
+
+\subsection{Step 1 --- Convert One Task to Static Allocation}
+
+Convert \texttt{vLoggerTask} from dynamic to static allocation:
+
+\begin{lstlisting}[style=cstyle]
+/* static_alloc.c */
+static StaticTask_t xLoggerTaskBuffer;
+static StackType_t  xLoggerStack[256];   /* right-sized from Part B */
+
+TaskHandle_t xLoggerHandle = xTaskCreateStatic(
+    vLoggerTask, "Logger", 256, NULL, 1,
+    xLoggerStack, &xLoggerTaskBuffer
+);
+\end{lstlisting}
+
+Ensure \file{FreeRTOSConfig.h} has:
+
+\begin{lstlisting}[style=cstyle]
+#define configSUPPORT_STATIC_ALLOCATION   1
+#define configSUPPORT_DYNAMIC_ALLOCATION  1
+
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
+                                    StackType_t  **ppxIdleTaskStackBuffer,
+                                    uint32_t      *pulIdleTaskStackSize)
+{
+    static StaticTask_t xIdleTaskTCB;
+    static StackType_t  xIdleTaskStack[configMINIMAL_STACK_SIZE];
+    *ppxIdleTaskTCBBuffer   = &xIdleTaskTCB;
+    *ppxIdleTaskStackBuffer = xIdleTaskStack;
+    *pulIdleTaskStackSize   = configMINIMAL_STACK_SIZE;
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Measure Heap Change}
+
+Run \texttt{xPortGetFreeHeapSize()} before and after switching to static allocation.
+Expected: free heap increases by approximately
+\texttt{sizeof(StaticTask\_t) + 256*4} bytes.
+
+\begin{checkpointbox}[~D]
+  UART output showing free heap before and after the conversion.
+\end{checkpointbox}
+
+\begin{questionbox}[~D1]
+  With \texttt{configSUPPORT\_STATIC\_ALLOCATION = 1} and
+  \texttt{configSUPPORT\_DYNAMIC\_ALLOCATION = 0} (all static), what are the benefits
+  for a safety-critical system? What does the linker map tell you that
+  \texttt{xPortGetFreeHeapSize()} cannot?
+\end{questionbox}
+
+\begin{questionbox}[~D2]
+  \texttt{vApplicationGetIdleTaskMemory} must be implemented when static allocation is
+  enabled. Why does the idle task require static allocation even if all your application
+  tasks use dynamic allocation?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A1 UART capture  & Crash without detection \\
+  2 & Part A2 UART capture  & Stack overflow hook message \\
+  3 & Part B HWM table      & All Lab~03 tasks + overflow task \\
+  4 & Part C map table      & Linker section sizes \\
+  5 & Part D UART capture   & Heap usage before and after static conversion \\
+  6 & Written answers       & Questions A1--A2, B1--B2, D1--D2 \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Stack overflow $\to$ silent corruption       & Part A (no detection) \\
+  \texttt{vApplicationStackOverflowHook}       & Part A (with detection) \\
+  High-water-mark measurement and right-sizing & Part B \\
+  Heap usage accounting                        & Part C \\
+  Linker map section analysis                  & Part C \\
+  Static task allocation (\texttt{xTaskCreateStatic}) & Part D \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Barry, \textit{Mastering the FreeRTOS Kernel} & Ch.~3 (heap schemes) \\
+  FreeRTOS docs &
+    \texttt{configCHECK\_FOR\_STACK\_OVERFLOW},
+    \texttt{uxTaskGetStackHighWaterMark},
+    \texttt{xTaskCreateStatic} \\
+  NXP MCXN236 Reference Manual & \S SRAM memory map \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

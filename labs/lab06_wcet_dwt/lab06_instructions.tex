@@ -1,0 +1,423 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 06}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 06 -- WCET Measurement with DWT \& Interrupt Latency},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{06}{WCET Measurement with DWT \& Interrupt Latency}{3--4}{CLO 3 \& CLO 4}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Enable and read} the DWT cycle counter on the ARM Cortex-M33 at
+        150\,MHz.
+  \item \textbf{Measure} best-case, average, and worst-case execution time for a
+        data-processing function over 1\,000 runs.
+  \item \textbf{Apply} a WCET safety margin and use the result as $C_i$ in
+        schedulability analysis.
+  \item \textbf{Measure} interrupt latency from IRQ assertion to first ISR instruction
+        using an oscilloscope or logic analyser.
+  \item \textbf{Compare} measured interrupt latency with and without a FreeRTOS critical
+        section active.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 03 complete.
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+  \item Oscilloscope or logic analyser with $\geq 4$ channels (for Part~B). A probe on
+        GPIO pins is sufficient.
+  \item FRDM-MCXN236 board --- no other hardware required for Part~A.
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{Why Measure WCET?}
+
+The Response-Time Analysis from Week 3 requires a bound $C_i$ on task execution time. In
+practice, $C_i$ is obtained by:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Static analysis} --- examine all paths, compute worst-case bound.
+        Requires special tools (aiT, Bound-T).
+  \item \textbf{Measurement-based} --- run the function many times with controlled
+        inputs, take the maximum plus a safety margin.
+\end{enumerate}
+
+This lab uses measurement-based WCET --- practical for most systems below SIL-3/ASIL-D.
+
+\subsection{DWT Cycle Counter}
+
+The ARM Data Watchpoint and Trace (DWT) unit has a 32-bit free-running cycle counter.
+Steps to enable:
+
+\begin{lstlisting}[style=cstyle]
+CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  /* enable DWT */
+DWT->CYCCNT = 0;
+DWT->CTRL   |= DWT_CTRL_CYCCNTENA_Msk;            /* start counting */
+\end{lstlisting}
+
+Read: \texttt{uint32\_t cycles = DWT->CYCCNT;}
+
+At 150\,MHz, 1 cycle = 6.67\,ns. The counter rolls over after $2^{32}$ cycles
+$\approx 28.6$\,seconds.
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab06_wcet_dwt/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c              <- DWT init, task creation
+    dwt.h               <- DWT enable/read macros
+    workload.c/.h       <- the functions to be measured
+    latency_test.c/.h   <- Part B: GPIO ISR latency test
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/
+\end{lstlisting}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- WCET Measurement}
+
+\subsection{Step 1 --- Enable DWT}
+
+In \file{dwt.h}:
+
+\begin{lstlisting}[style=cstyle]
+#ifndef DWT_H
+#define DWT_H
+#include "core_cm33.h"
+
+static inline void DWT_Enable(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
+    __DSB();
+    __ISB();
+}
+
+static inline uint32_t DWT_GetCycles(void)
+{
+    return DWT->CYCCNT;
+}
+
+#define DWT_START()  uint32_t _dwt_start = DWT_GetCycles()
+#define DWT_STOP()   uint32_t _dwt_elapsed = DWT_GetCycles() - _dwt_start
+#endif
+\end{lstlisting}
+
+\subsection{Step 2 --- Implement the Workload Functions}
+
+Three functions of increasing complexity in \file{workload.c}:
+
+\begin{lstlisting}[style=cstyle]
+/* Function 1: bubble sort -- data-dependent WCET */
+void bubble_sort(int16_t *arr, uint16_t n)
+{
+    for (uint16_t i = 0; i < n - 1; i++)
+        for (uint16_t j = 0; j < n - i - 1; j++)
+            if (arr[j] > arr[j+1]) {
+                int16_t tmp = arr[j];
+                arr[j]   = arr[j+1];
+                arr[j+1] = tmp;
+            }
+}
+
+/* Function 2: 16-tap FIR filter -- fixed WCET */
+int32_t fir_filter(const int16_t *x, const int16_t *h, uint16_t n)
+{
+    int32_t acc = 0;
+    for (uint16_t i = 0; i < n; i++)
+        acc += (int32_t)x[i] * h[i];
+    return acc >> 15;
+}
+
+/* Function 3: 32-bit CRC computation -- data-dependent */
+uint32_t crc32(const uint8_t *data, uint32_t len)
+{
+    uint32_t crc = 0xFFFFFFFFU;
+    while (len--) {
+        crc ^= *data++;
+        for (int k = 0; k < 8; k++)
+            crc = (crc >> 1) ^ (0xEDB88320U & -(crc & 1));
+    }
+    return ~crc;
+}
+\end{lstlisting}
+
+\subsection{Step 3 --- Measurement Task}
+
+\begin{lstlisting}[style=cstyle]
+#define NUM_RUNS     1000
+#define ARRAY_SIZE   100
+
+void vWcetMeasureTask(void *pv)
+{
+    static int16_t sorted[ARRAY_SIZE], reverse[ARRAY_SIZE], arr[ARRAY_SIZE];
+    static int16_t fir_h[16] = {1,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1};
+    uint32_t best, worst, sum, cycles;
+
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        sorted[i]  = (int16_t)i;
+        reverse[i] = (int16_t)(ARRAY_SIZE - 1 - i);
+    }
+
+    uart_printf("\r\n=== bubble_sort(%d elements) ===\r\n", ARRAY_SIZE);
+
+    /* Worst case: reverse sorted, NUM_RUNS times */
+    best = UINT32_MAX; worst = 0; sum = 0;
+    for (int r = 0; r < NUM_RUNS; r++) {
+        memcpy(arr, reverse, sizeof(reverse));
+        DWT_START();
+        bubble_sort(arr, ARRAY_SIZE);
+        DWT_STOP();
+        cycles = _dwt_elapsed;
+        if (cycles < best) best = cycles;
+        if (cycles > worst) worst = cycles;
+        sum += cycles;
+    }
+    uart_printf("  best=%lu  worst=%lu  avg=%lu cycles\r\n",
+                best, worst, sum / NUM_RUNS);
+    uart_printf("  WCET with 20%% margin: %lu cycles  (%.2f us)\r\n",
+                (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
+
+    uart_printf("\r\nMeasurement complete.\r\n");
+    vTaskDelete(NULL);
+}
+\end{lstlisting}
+
+\subsection{Step 4 --- Build, Flash, and Record Results}
+
+\begin{lstlisting}[style=bashstyle]
+make setup && make && make flash
+\end{lstlisting}
+
+\begin{checkpointbox}[~A]
+  Terminal output with all three function measurements.
+\end{checkpointbox}
+
+\begin{questionbox}[~A1]
+  Bubble sort has the same code path for all reverse-sorted inputs. Why does
+  \texttt{worst} vary across the 1\,000 runs even with identical input? Name two
+  hardware effects that cause this variability.
+\end{questionbox}
+
+\begin{questionbox}[~A2]
+  The FIR filter is data-independent (no branches). Does it show variability across
+  runs? What is the ratio of worst to best cycles? Explain.
+\end{questionbox}
+
+\begin{questionbox}[~A3]
+  You will use \texttt{bubble\_sort} as a task in Lab~07 with period $T = 50$\,ms.
+  Using the WCET + 20\% margin as $C_i$: compute the utilisation $C_i / T_i$. At what
+  maximum number of identical \texttt{bubble\_sort} tasks does the total utilisation
+  exceed the Liu \& Layland bound for RMS?
+\end{questionbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Interrupt Latency Measurement}
+
+\subsection{Step 1 --- Set Up the GPIO Toggling ISR}
+
+Wire a jumper from \texttt{P1\_0} (output) to \texttt{P1\_1} (input, interrupt on rising
+edge). The ISR immediately toggles \texttt{P1\_2} (output to oscilloscope probe).
+
+\begin{lstlisting}[style=cstyle]
+/* latency_test.c */
+void GPIO1_IRQHandler(void)
+{
+    GPIO_ClearPinsInterruptFlags(GPIO1, 1u << 1);
+    GPIO_TogglePinsOutput(GPIO1, 1u << 2);   /* respond ASAP */
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Configure GPIO and NVIC}
+
+\begin{lstlisting}[style=cstyle]
+/* Input: P1_1 rising edge interrupt */
+gpio_pin_config_t in_cfg  = { kGPIO_DigitalInput,  0, kGPIO_IntRisingEdge };
+GPIO_PinInit(GPIO1, 1, &in_cfg);
+GPIO_EnableInterrupts(GPIO1, 1u << 1);
+EnableIRQ(GPIO1_IRQn);
+
+/* Output: P1_2 */
+gpio_pin_config_t out_cfg = { kGPIO_DigitalOutput, 0, kGPIO_NoIntmode };
+GPIO_PinInit(GPIO1, 2, &out_cfg);
+\end{lstlisting}
+
+\subsection{Step 3 --- Drive the Input and Measure}
+
+Three measurement options:
+
+\begin{itemize}[noitemsep, leftmargin=*]
+  \item \textbf{Option A --- Logic analyser:} toggle \texttt{P1\_0} at 1\,kHz from a
+        software task; measure \texttt{P1\_1}-rising to \texttt{P1\_2}-rising.
+  \item \textbf{Option B --- Oscilloscope:} probe \texttt{P1\_1} (CH1) and
+        \texttt{P1\_2} (CH2); trigger on CH1 rising; measure propagation delay.
+  \item \textbf{Option C --- DWT inside the ISR:} record \texttt{DWT->CYCCNT} as the
+        first ISR instruction and compare against the cycle count set just before
+        toggling \texttt{P1\_0}.
+\end{itemize}
+
+\subsection{Step 4 --- Measure With and Without Critical Section}
+
+Repeat the measurement with a FreeRTOS critical section active in a background task:
+
+\begin{lstlisting}[style=cstyle]
+void vCriticalSectionTask(void *pv)
+{
+    for (;;) {
+        taskENTER_CRITICAL();
+        volatile uint32_t i = 0;
+        while (i++ < 150000) {}   /* ~1 ms at 150 MHz */
+        taskEXIT_CRITICAL();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+\end{lstlisting}
+
+\begin{checkpointbox}[~B]
+  Table or oscilloscope screenshot showing latency with and without the critical
+  section.
+\end{checkpointbox}
+
+\begin{questionbox}[~B1]
+  Your measured best-case latency should be 12--18 cycles. Convert this to nanoseconds
+  at 150\,MHz. How does this compare to the theoretical minimum from the ARM
+  Cortex-M33 TRM (exception entry stacking)?
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  With the critical section active, what is the worst-case interrupt latency? Where does
+  the extra latency come from? What FreeRTOS configuration parameter controls this?
+\end{questionbox}
+
+\begin{questionbox}[~B3]
+  The ISR priority is set to
+  \texttt{configLIBRARY\_MAX\_SYSCALL\_INTERRUPT\_PRIORITY - 1}. Why can this ISR still
+  be deferred by \texttt{taskENTER\_CRITICAL}? What priority would you set to make the
+  ISR \textbf{non-maskable} by FreeRTOS?
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Full Task WCET in Context}
+
+\subsection{Step 1 --- Measure Task Response Time End-to-End}
+
+Create a periodic task that runs \texttt{bubble\_sort} on random data every 50\,ms.
+Use DWT to measure from task entry to task return, with two background tasks also active
+(priorities 1 and 2):
+
+\begin{lstlisting}[style=cstyle]
+void vSortTask(void *pv)
+{
+    static int16_t arr[ARRAY_SIZE];
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(50));
+        for (int i = 0; i < ARRAY_SIZE; i++) arr[i] = (int16_t)(rand() % 1000);
+        DWT_START();
+        bubble_sort(arr, ARRAY_SIZE);
+        DWT_STOP();
+        uart_printf("[SORT] %lu cycles  (%.2f us)\r\n",
+                    _dwt_elapsed, _dwt_elapsed / 150.0f);
+    }
+}
+\end{lstlisting}
+
+Compare the measured cycles to Part~A's isolated measurement.
+
+\begin{questionbox}[~C1]
+  Does running alongside other tasks increase the measured execution time? What hardware
+  effect causes this? What does this tell you about measurement-based WCET methodology?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A terminal output    & Full measurement table for all three functions \\
+  2 & Part A analysis           & WCET + 20\% margin and schedulability (Question~A3) \\
+  3 & Part B measurement        & Latency table or oscilloscope screenshot \\
+  4 & Part B analysis           & With and without critical section (Question~B2) \\
+  5 & Written answers           & Questions A1--A3, B1--B3, C1 \\
+  6 & \file{dwt.h} header file  & Full source listing \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  DWT cycle counter enable and read         & Part A setup \\
+  Best/average/worst-case measurement       & Part A \\
+  WCET safety margin application            & Part A Question~A3 \\
+  Interrupt latency: hardware stacking      & Part B \\
+  BASEPRI masking and FreeRTOS critical section & Part B \\
+  Context and cache effects on WCET         & Part C \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Wilhelm et al.\ (2008) &
+    ``The worst-case execution time problem'' (\textit{ACM TECS}) \\
+  ARM Cortex-M33 TRM & \S DWT, \S B2.3 exception entry \\
+  NXP MCXN236 RM & \S CoreDebug, \S DWT \\
+  FreeRTOS docs &
+    \texttt{taskENTER\_CRITICAL}, \texttt{configMAX\_SYSCALL\_INTERRUPT\_PRIORITY} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

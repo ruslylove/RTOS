@@ -1,0 +1,433 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 05}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 05 -- Deadlock Detection \& Watchdog Timers},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{05}{Deadlock Detection \& Watchdog Timers}{3}{CLO 4}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Induce} a deadlock between two tasks holding two mutexes in opposite
+        order.
+  \item \textbf{Prevent} deadlock using the resource-ordering convention.
+  \item \textbf{Configure} the MCXN236 hardware watchdog (WDOG32) and observe a reset.
+  \item \textbf{Implement} a software watchdog pattern using task notifications.
+  \item \textbf{Isolate} a hung task --- log its identity and trigger a controlled reset.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 04 complete --- mutexes and SystemView working.
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{Deadlock and the Four Coffman Conditions}
+
+A deadlock requires all four conditions simultaneously:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Mutual exclusion} --- resources are non-shareable.
+  \item \textbf{Hold and wait} --- a task holds at least one resource while waiting for
+        another.
+  \item \textbf{No preemption} --- resources are released only voluntarily.
+  \item \textbf{Circular wait} --- a cycle exists in the resource-allocation graph.
+\end{enumerate}
+
+FreeRTOS mutexes satisfy conditions 1--3 by design. Your task is to prevent condition~4
+using \textbf{resource ordering}: assign a global lock order and always acquire resources
+in ascending order.
+
+\subsection{Hardware Watchdog}
+
+The MCXN236 WDOG32 generates a system reset if not refreshed within a configured window.
+This is the last line of defence against a hung system.
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab05_watchdog/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c               <- task creation, WDOG init
+    deadlock_tasks.c/.h  <- Parts A & B
+    watchdog.c/.h        <- Parts C & D hardware + software watchdog
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/
+\end{lstlisting}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Induce a Deadlock}
+
+\subsection{Step 1 --- Implement the Deadlock Scenario}
+
+Create two mutexes and two tasks that acquire them in opposite order:
+
+\begin{lstlisting}[style=cstyle]
+/* main.c */
+SemaphoreHandle_t xMutexA;
+SemaphoreHandle_t xMutexB;
+
+xMutexA = xSemaphoreCreateMutex();
+xMutexB = xSemaphoreCreateMutex();
+\end{lstlisting}
+
+\begin{lstlisting}[style=cstyle]
+/* deadlock_tasks.c */
+void vTaskAlpha(void *pv)  /* prio 2 */
+{
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        uart_printf("[A] taking MutexA...\r\n");
+        xSemaphoreTake(xMutexA, portMAX_DELAY);
+        uart_printf("[A] took MutexA. Taking MutexB...\r\n");
+        vTaskDelay(pdMS_TO_TICKS(5));
+        xSemaphoreTake(xMutexB, portMAX_DELAY);
+        uart_printf("[A] took both -- doing work\r\n");
+        xSemaphoreGive(xMutexB);
+        xSemaphoreGive(xMutexA);
+    }
+}
+
+void vTaskBeta(void *pv)   /* prio 2 */
+{
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        uart_printf("[B] taking MutexB...\r\n");
+        xSemaphoreTake(xMutexB, portMAX_DELAY);
+        uart_printf("[B] took MutexB. Taking MutexA...\r\n");
+        vTaskDelay(pdMS_TO_TICKS(5));
+        xSemaphoreTake(xMutexA, portMAX_DELAY);  /* <- opposite order to Task A */
+        uart_printf("[B] took both -- doing work\r\n");
+        xSemaphoreGive(xMutexA);
+        xSemaphoreGive(xMutexB);
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Build, Flash, and Observe}
+
+\begin{lstlisting}[style=bashstyle]
+make setup && make && make flash
+\end{lstlisting}
+
+Watch the terminal. Within a few seconds, both \texttt{[A]} and \texttt{[B]} will stop
+printing ``took both'' --- the system is deadlocked.
+
+\begin{checkpointbox}[~A]
+  UART capture showing the last lines before deadlock, with both tasks blocked.
+\end{checkpointbox}
+
+\begin{questionbox}[~A1]
+  Draw the resource allocation graph at the moment of deadlock. Label each edge as an
+  assignment or a request edge. Which Coffman condition does the circular edge represent?
+\end{questionbox}
+
+\begin{questionbox}[~A2]
+  The deadlock is \textbf{non-deterministic} --- it does not always happen on the first
+  iteration. What determines how quickly it manifests? Would the deadlock still be
+  possible if both tasks ran at different priorities?
+\end{questionbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Prevent with Resource Ordering}
+
+\subsection{Step 1 --- Apply Resource Ordering}
+
+Assign a global lock order constant and enforce it in both tasks:
+
+\begin{lstlisting}[style=cstyle]
+/* deadlock_tasks.c -- FIXED */
+#define LOCK_ORDER_MUTEX_A  1
+#define LOCK_ORDER_MUTEX_B  2
+/* Rule: always acquire in ascending order */
+
+/* vTaskAlpha unchanged -- already acquires A then B (correct order) */
+
+void vTaskBeta(void *pv)   /* FIXED: acquire A before B */
+{
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        uart_printf("[B] taking MutexA (order fix)...\r\n");
+        xSemaphoreTake(xMutexA, portMAX_DELAY);   /* A first */
+        uart_printf("[B] taking MutexB...\r\n");
+        xSemaphoreTake(xMutexB, portMAX_DELAY);   /* B second */
+        uart_printf("[B] took both -- doing work\r\n");
+        xSemaphoreGive(xMutexB);
+        xSemaphoreGive(xMutexA);
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Verify No Deadlock}
+
+Run for at least 60 seconds. Both tasks should continue printing ``took both''
+indefinitely.
+
+\begin{checkpointbox}[~B]
+  UART capture of 10+ seconds of normal operation with no deadlock.
+\end{checkpointbox}
+
+\begin{questionbox}[~B1]
+  Resource ordering prevents deadlock by breaking which Coffman condition? Explain
+  precisely why a total order on acquisition prevents a cycle in the
+  resource-allocation graph.
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  Your system has 6 mutexes protecting 6 different subsystems. How do you choose the
+  lock order? What property must the ordering have? Is it always possible?
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Hardware Watchdog}
+
+\subsection{Step 1 --- Configure WDOG32}
+
+The MCXN236 WDOG32 resets the chip if not refreshed within a timeout window.
+
+\begin{lstlisting}[style=cstyle]
+/* watchdog.c */
+#include "fsl_wdog32.h"
+
+void WDOG_Init_1s(void)
+{
+    wdog32_config_t cfg;
+    WDOG32_GetDefaultConfig(&cfg);
+    cfg.timeoutValue = 0x100U;   /* ~1 second at LPO 128 Hz */
+    cfg.enableWdog32 = true;
+    cfg.clockSource  = kWDOG32_ClockSourceLpoClk;
+    cfg.prescaler    = kWDOG32_ClockPrescalerDivide1;
+    WDOG32_Init(WDOG0, &cfg);
+}
+
+void WDOG_Kick(void)
+{
+    WDOG32_Refresh(WDOG0);
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Normal Operation}
+
+Create a high-priority watchdog task that kicks every 500\,ms:
+
+\begin{lstlisting}[style=cstyle]
+void vWatchdogTask(void *pv)  /* prio 4 -- highest */
+{
+    WDOG_Init_1s();
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        WDOG_Kick();
+        uart_printf("[WDG] kicked\r\n");
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 3 --- Trigger the Watchdog Reset}
+
+Add a \texttt{\#define SIMULATE\_HANG 1} build flag. When set, \texttt{vWatchdogTask}
+sleeps for 2\,seconds instead of kicking:
+
+\begin{lstlisting}[style=cstyle]
+#ifdef SIMULATE_HANG
+    vTaskDelay(pdMS_TO_TICKS(2000));   /* miss deadline -> watchdog fires */
+#else
+    WDOG_Kick();
+#endif
+\end{lstlisting}
+
+Build with \texttt{make HANG=1 \&\& make HANG=1 flash}.
+
+In \file{main.c}, before the scheduler starts, check the reset cause:
+
+\begin{lstlisting}[style=cstyle]
+if (WDOG32_GetStatusFlags(WDOG0) & kWDOG32_InterruptFlag) {
+    uart_printf("[BOOT] Reset caused by watchdog!\r\n");
+}
+\end{lstlisting}
+
+\begin{checkpointbox}[~C]
+  UART capture showing \texttt{[BOOT] Reset caused by watchdog!} on the reboot
+  following the simulated hang.
+\end{checkpointbox}
+
+\begin{questionbox}[~C1]
+  The WDOG32 uses the LPO (Low-Power Oscillator) at 128\,Hz. Calculate the exact
+  timeout in milliseconds for \texttt{timeoutValue = 0x100}. Why is a low-power
+  oscillator used rather than the main system clock?
+\end{questionbox}
+
+\begin{questionbox}[~C2]
+  A \textbf{window watchdog} adds a minimum refresh time --- you cannot kick too early
+  OR too late. How would you configure a window watchdog to catch a ``too-fast'' kick?
+  Sketch the \texttt{cfg.windowValue} setting.
+\end{questionbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Software Watchdog with Task Monitoring}
+
+\subsection{Step 1 --- Multi-Task Monitoring Pattern}
+
+The hardware watchdog is kicked by a dedicated monitor task that only kicks if
+\textbf{all} worker tasks have checked in during the last interval:
+
+\begin{lstlisting}[style=cstyle]
+/* watchdog.c -- software monitor */
+#define NUM_WORKERS  3
+static volatile uint8_t worker_alive[NUM_WORKERS];
+
+void wdog_checkin(uint8_t worker_id)
+{
+    worker_alive[worker_id] = 1;
+}
+
+void vWatchdogMonitor(void *pv)  /* prio 4 */
+{
+    WDOG_Init_1s();
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        bool all_ok = true;
+        for (int i = 0; i < NUM_WORKERS; i++) {
+            if (!worker_alive[i]) {
+                uart_printf("[WDG] worker %d silent -- NOT kicking!\r\n", i);
+                all_ok = false;
+            }
+            worker_alive[i] = 0;
+        }
+        if (all_ok) {
+            WDOG_Kick();
+            uart_printf("[WDG] all workers OK -- kicked\r\n");
+        }
+    }
+}
+
+void vWorkerTask(void *pv)
+{
+    uint8_t id = (uint8_t)(uintptr_t)pv;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+        wdog_checkin(id);
+        uart_printf("[W%d] working\r\n", id);
+    }
+}
+\end{lstlisting}
+
+\subsection{Step 2 --- Simulate a Hanging Worker}
+
+Add a flag to stop one worker checking in after 5 seconds:
+
+\begin{lstlisting}[style=cstyle]
+if (id == 1 && xTaskGetTickCount() > pdMS_TO_TICKS(5000)) {
+    for (;;) {}   /* hang -- no checkin */
+}
+\end{lstlisting}
+
+After the hang, the monitor stops kicking within 500\,ms, and the watchdog fires
+$\approx$1\,second later.
+
+\begin{checkpointbox}[~D]
+  UART capture showing the monitor detecting the silent worker, then the board reset
+  and reboot message.
+\end{checkpointbox}
+
+\begin{questionbox}[~D1]
+  In this pattern, the monitor task itself could hang. How would you guard against
+  that? (Hint: think about who monitors the monitor.)
+\end{questionbox}
+
+\begin{questionbox}[~D2]
+  The worker uses a \texttt{volatile uint8\_t} flag rather than a task notification.
+  What are the pros and cons of each approach? Which is safer in an RTOS context and
+  why?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A UART capture  & Deadlock state visible \\
+  2 & Part A RAG diagram   & Resource-allocation graph (hand-drawn or tool) \\
+  3 & Part B UART capture  & 60+ seconds of normal operation \\
+  4 & Part C UART capture  & Watchdog reset cause message on reboot \\
+  5 & Part D UART capture  & Monitor detecting silent worker + reset \\
+  6 & Written answers      & Questions A1--A2, B1--B2, C1--C2, D1--D2 \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Deadlock induction --- opposite lock order    & Part A \\
+  Coffman condition 4 --- circular wait         & Part A diagram \\
+  Resource ordering --- deadlock prevention     & Part B \\
+  WDOG32 hardware watchdog configuration        & Part C \\
+  Reset cause detection at boot                 & Part C \\
+  Software watchdog with per-task monitoring    & Part D \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Coffman, Elphick \& Shoshani (1971) &
+    ``System deadlocks'' (\textit{ACM Computing Surveys}) \\
+  Barry, \textit{Mastering the FreeRTOS Kernel} & Ch.~6 (mutexes) \\
+  NXP MCXN236 Reference Manual & Chapter WDOG32 \\
+  NXP MCUXpresso SDK & \texttt{fsl\_wdog32.h}, \texttt{WDOG32\_GetDefaultConfig} \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

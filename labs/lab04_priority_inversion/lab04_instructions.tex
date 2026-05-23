@@ -1,0 +1,380 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 04}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 04 -- Priority Inversion: See It, Fix It},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{04}{Priority Inversion: See It, Fix It}{2--3}{CLO 3 \& CLO 4}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Reproduce} the classic three-task priority inversion scenario on real hardware.
+  \item \textbf{Observe} the inversion window in a SEGGER SystemView trace and measure its
+        duration.
+  \item \textbf{Quantify} the difference between theoretical worst-case response time with and
+        without PIP.
+  \item \textbf{Fix} the inversion by replacing a binary semaphore with a FreeRTOS mutex.
+  \item \textbf{Verify} the fix --- $\tau_H$'s response time must not exceed $\tau_L$'s
+        critical-section length.
+\end{enumerate}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 03 complete --- SystemView setup working.
+  \item SEGGER SystemView running and connected to the board.
+  \item ARM GNU Toolchain and \texttt{pyocd} working.
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+Priority inversion occurs when a high-priority task ($\tau_H$) blocks on a resource held
+by a low-priority task ($\tau_L$), and a medium-priority task ($\tau_M$) preempts
+$\tau_L$ --- causing $\tau_H$ to wait for $\tau_M$, even though $\tau_M$ shares no
+resource with $\tau_H$.
+
+\textbf{Without PIP:}
+Response time of $\tau_H \geq$ duration of $\tau_M$'s execution + $\tau_L$'s remaining
+critical section. This can be arbitrarily long.
+
+\textbf{With PIP (FreeRTOS mutex):}
+When $\tau_H$ blocks, $\tau_L$ inherits $\tau_H$'s priority. $\tau_M$ cannot preempt
+$\tau_L$. $\tau_H$'s blocking is bounded to at most one $\tau_L$ critical section.
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab04_priority_inversion/
+  Makefile
+  linker_MCXN236.ld
+  src/
+    main.c               <- task creation, kernel object init
+    inversion_tasks.c/.h <- tauH, tauM, tauL implementations
+    FreeRTOSConfig.h
+    uart.h / uart.c
+  FreeRTOS-Kernel/
+\end{lstlisting}
+
+\subsection{Task Parameters}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{2.5cm} c c p{5cm} @{}}
+  \toprule
+  \textbf{Task} & \textbf{Priority} & \textbf{Period} & \textbf{Critical section} \\
+  \midrule
+  $\tau_H$ (high)   & 3 & 200\,ms & Takes shared resource for 5\,ms \\
+  $\tau_M$ (medium) & 2 & 150\,ms & Runs 30\,ms of computation (no shared resource) \\
+  $\tau_L$ (low)    & 1 & 300\,ms & Holds shared resource for 40\,ms \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Reproduce the Inversion (Binary Semaphore)}
+
+\subsection{Step 1 --- Implement the Three Tasks}
+
+In \file{inversion\_tasks.c}, use a \textbf{binary semaphore}
+(\texttt{xSemaphoreCreateBinary}, pre-given to \texttt{pdTRUE}) as the shared resource
+guard:
+
+\begin{lstlisting}[style=cstyle]
+void vTaskH(void *pv)   /* prio 3 */
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(200));
+        TickType_t t_arrive = xTaskGetTickCount();
+        uart_printf("[H] arrived at %lu ms\r\n", t_arrive);
+
+        xSemaphoreTake(xSharedResource, portMAX_DELAY);
+        TickType_t t_acquire = xTaskGetTickCount();
+        uart_printf("[H] acquired at %lu ms  (waited %lu ms)\r\n",
+                    t_acquire, t_acquire - t_arrive);
+
+        vTaskDelay(pdMS_TO_TICKS(5));   /* critical section */
+        xSemaphoreGive(xSharedResource);
+        uart_printf("[H] released resource\r\n");
+    }
+}
+
+void vTaskM(void *pv)   /* prio 2 */
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(150));
+        uart_printf("[M] running (no resource held)\r\n");
+        TickType_t start = xTaskGetTickCount();
+        while ((xTaskGetTickCount() - start) < pdMS_TO_TICKS(30)) {}
+        uart_printf("[M] done\r\n");
+    }
+}
+
+void vTaskL(void *pv)   /* prio 1 */
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(300));
+        xSemaphoreTake(xSharedResource, portMAX_DELAY);
+        uart_printf("[L] acquired resource -- holding for 40 ms\r\n");
+        TickType_t start = xTaskGetTickCount();
+        while ((xTaskGetTickCount() - start) < pdMS_TO_TICKS(40)) {}
+        xSemaphoreGive(xSharedResource);
+        uart_printf("[L] released resource\r\n");
+    }
+}
+\end{lstlisting}
+
+\begin{warnbox}
+  Tasks are offset at startup so that $\tau_L$ acquires the resource first, $\tau_H$
+  arrives while $\tau_L$ holds it, and $\tau_M$ preempts $\tau_L$ shortly after. This is
+  handled in \file{main.c} using initial \texttt{vTaskDelay} offsets.
+\end{warnbox}
+
+\subsection{Step 2 --- Build and Flash}
+
+\begin{lstlisting}[style=bashstyle]
+make setup && make && make flash
+\end{lstlisting}
+
+\subsection{Step 3 --- Capture UART Output}
+
+Watch for lines where $\tau_H$'s \texttt{waited X ms} value is much larger than the
+40\,ms $\tau_L$ critical section alone.
+
+Expected inversion output:
+\begin{lstlisting}[style=textstyle]
+[L] acquired resource -- holding for 40 ms
+[H] arrived at 100 ms
+[M] running (no resource held)
+[M] done
+[L] released resource
+[H] acquired resource at 170 ms  (waited 70 ms)
+\end{lstlisting}
+
+\subsection{Step 4 --- Capture SystemView Trace}
+
+Open SystemView, start recording, let the system run for at least 3 seconds, then stop.
+In the trace, find an inversion event:
+\begin{itemize}[noitemsep, leftmargin=*]
+  \item Identify the moment $\tau_H$ blocks on the semaphore.
+  \item Identify the moment $\tau_M$ preempts $\tau_L$.
+  \item Measure the \textbf{inversion window} --- the time $\tau_H$ waits while $\tau_M$
+        is running.
+\end{itemize}
+
+\begin{checkpointbox}[~A]
+  Annotated SystemView screenshot with the inversion window marked and measured.
+\end{checkpointbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Theoretical Analysis}
+
+Before fixing the system, compute the worst-case response time analytically.
+
+Without PIP, $\tau_H$'s response time can be bounded as:
+\[
+  R_H \leq C_H + B_H + \sum_{j \in \mathrm{hp}(H)} \left\lceil \frac{R_H}{T_j} \right\rceil C_j
+\]
+where $B_H$ is the \textbf{blocking term}. Without PIP, $B_H$ is unbounded ($\tau_M$ can
+always preempt $\tau_L$).
+
+With PIP, $B_H$ is bounded to the longest critical section of any lower-priority task
+sharing the resource:
+\[
+  B_H = \max(\text{CS of lower-priority tasks}) = 40\,\mathrm{ms}
+\]
+
+\begin{questionbox}[~B1]
+  Using the task parameters from the table, apply the RTA recurrence to compute
+  $\tau_H$'s worst-case response time \textbf{with PIP}. Show your iteration steps.
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  From your UART output in Part~A, what is the maximum \texttt{waited X ms} value you
+  observed across multiple periods? Does it match the theoretical without-PIP bound?
+\end{questionbox}
+
+\begin{questionbox}[~B3]
+  Compute total utilisation $U$ for the three-task set. Is it schedulable under RMS?
+  Does priority inversion change the schedulability answer? (Hint: yes and no ---
+  explain.)
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Fix with a Mutex}
+
+\subsection{Step 1 --- Replace Binary Semaphore with Mutex}
+
+In \file{main.c}, change one line:
+
+\begin{lstlisting}[style=cstyle]
+/* BEFORE (binary semaphore -- no PIP): */
+xSharedResource = xSemaphoreCreateBinary();
+xSemaphoreGive(xSharedResource);
+
+/* AFTER (mutex -- PIP enabled): */
+xSharedResource = xSemaphoreCreateMutex();
+\end{lstlisting}
+
+Also ensure \file{FreeRTOSConfig.h} has:
+\begin{lstlisting}[style=cstyle]
+#define configUSE_MUTEXES  1
+\end{lstlisting}
+
+No other code changes are needed --- \texttt{xSemaphoreTake} and \texttt{xSemaphoreGive}
+have the same API for both mutexes and binary semaphores.
+
+\subsection{Step 2 --- Rebuild and Flash}
+
+\begin{lstlisting}[style=bashstyle]
+make && make flash
+\end{lstlisting}
+
+\subsection{Step 3 --- Observe the Fix}
+
+$\tau_H$'s \texttt{waited} time should now be $\leq 40$\,ms. $\tau_M$ cannot preempt
+$\tau_L$ while $\tau_L$ holds the mutex.
+
+Expected fixed output:
+\begin{lstlisting}[style=textstyle]
+[L] acquired resource -- holding for 40 ms
+[H] arrived at 100 ms
+[H] acquired resource at 140 ms  (waited 40 ms)
+[M] running (no resource held)
+[M] done
+\end{lstlisting}
+
+\subsection{Step 4 --- Capture the Fixed SystemView Trace}
+
+In the fixed trace, $\tau_L$'s priority \textbf{spikes to $\tau_H$'s priority level}
+when $\tau_H$ blocks (visible in SystemView as a priority change event).
+
+\begin{checkpointbox}[~C]
+  Annotated SystemView screenshot showing the priority inheritance event
+  ($\tau_L$ running at $\tau_H$'s priority).
+\end{checkpointbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- Experiments}
+
+\subsection{Experiment 1 --- Deep Nesting}
+
+Add a \textbf{second} shared resource \texttt{xResource2} (also a mutex). Modify $\tau_L$
+to hold both resources:
+
+\begin{lstlisting}[style=cstyle]
+xSemaphoreTake(xSharedResource, portMAX_DELAY);
+vTaskDelay(pdMS_TO_TICKS(10));
+xSemaphoreTake(xResource2, portMAX_DELAY);
+/* ... critical section ... */
+xSemaphoreGive(xResource2);
+xSemaphoreGive(xSharedResource);
+\end{lstlisting}
+
+And $\tau_M$ also competes for \texttt{xResource2}.
+
+\begin{questionbox}[~D1]
+  FreeRTOS PIP documentation states that the current implementation propagates
+  inheritance only \textbf{one level deep} --- it does not fully propagate chained
+  inheritance. Describe a scenario with this two-resource design where $\tau_H$ still
+  experiences unexpected delay even with mutexes.
+\end{questionbox}
+
+\subsection{Experiment 2 --- ISR Give}
+
+Replace the \texttt{xSemaphoreGive} inside \texttt{vTaskL} with a give from a software
+timer callback (simulating an ISR-side release).
+
+\begin{questionbox}[~D2]
+  \texttt{xSemaphoreGiveFromISR} does \textbf{not} trigger priority inheritance
+  restoration. After $\tau_L$ ``gives'' from the ISR callback, does $\tau_L$'s priority
+  return to its original level immediately? What does this tell you about using mutexes
+  for resources released from ISR context?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{4.5cm} p{7cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A UART capture   & At least one inversion event with \texttt{waited} annotated \\
+  2 & Part A SystemView screenshot & Inversion window marked and measured \\
+  3 & Part B analysis       & RTA calculation with and without PIP \\
+  4 & Part C UART capture   & \texttt{waited} bounded to $\leq 40$\,ms \\
+  5 & Part C SystemView screenshot & Priority inheritance event visible \\
+  6 & Written answers       & Questions B1--B3, D1--D2 \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{7cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Three-task priority inversion scenario      & Part A \\
+  Inversion window measurement                & Part A SystemView trace \\
+  RTA blocking term $B_H$                     & Part B analysis \\
+  Mutex vs.\ binary semaphore for PIP         & Part C code change \\
+  Priority inheritance in SystemView          & Part C trace \\
+  Limits of FreeRTOS PIP (one-level)          & Experiment D1 \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{5.5cm} p{7.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  Sha, Rajkumar \& Lehoczky (1990) &
+    ``Priority Inheritance Protocols'' (\textit{IEEE Trans. Computers}) \\
+  Buttazzo, \textit{Hard Real-Time Computing Systems} & Ch.~7.1--7.3 \\
+  FreeRTOS docs & \texttt{xSemaphoreCreateMutex}, \texttt{configUSE\_MUTEXES} \\
+  SEGGER SystemView manual & Priority display, event annotations \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}
