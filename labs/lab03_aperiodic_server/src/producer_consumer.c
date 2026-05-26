@@ -16,7 +16,7 @@
 #include "queue.h"
 #include "event_groups.h"
 #include "producer_consumer.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 /* Sensor 1 — Producer, T = 100 ms, priority 3                               */
@@ -45,7 +45,7 @@ void vSensor1Task(void *pvParameters)
         /* TODO: Send to pipeline queue (non-blocking — drop if full) */
         if (xQueueSend(xPipelineQueue, &r, 0) != pdTRUE)
         {
-            uart_printf("[S1] queue full -- dropped reading val=%d\r\n", raw);
+            PRINTF("[S1] queue full -- dropped reading val=%d\r\n", raw);
         }
     }
 }
@@ -95,7 +95,7 @@ void vLoggerTask(void *pvParameters)
         xQueueReceive(xPipelineQueue, &r, portMAX_DELAY);
 
         count++;
-        uart_printf("[LOG] #%lu  sensor=%d  val=%d  t=%lu ms\r\n",
+        PRINTF("[LOG] #%u  sensor=%d  val=%d  t=%u ms\r\n",
                     count, r.sensor_id, r.value, r.timestamp);
 
         /* TODO: Set BIT_ALARM if value exceeds threshold */
@@ -141,13 +141,13 @@ void vMonitorTask(void *pvParameters)
 
         if (bits & BIT_DATA_READY)
         {
-            uart_printf("[MON] 10-item batch complete  t=%lu ms\r\n",
+            PRINTF("[MON] 10-item batch complete  t=%u ms\r\n",
                         (uint32_t)xTaskGetTickCount());
         }
 
         if (bits & BIT_ALARM)
         {
-            uart_printf("[MON] ALARM: value exceeded threshold  t=%lu ms\r\n",
+            PRINTF("[MON] ALARM: value exceeded threshold  t=%u ms\r\n",
                         (uint32_t)xTaskGetTickCount());
         }
     }

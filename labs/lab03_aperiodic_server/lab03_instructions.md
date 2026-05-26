@@ -46,16 +46,15 @@ Two strategies are in scope for this lab:
 ```
 lab03_aperiodic_server/
 ├── Makefile
-├── linker_MCXN236.ld
 ├── src/
 │   ├── main.c                 ← creates all tasks and kernel objects
 │   ├── periodic_tasks.c/.h    ← τ1 (100 ms), τ2 (200 ms) background load
 │   ├── aperiodic_handler.c/.h ← deferred ISR task + Polling Server task
 │   ├── producer_consumer.c/.h ← two-producer / one-consumer pipeline (Part C)
-│   ├── FreeRTOSConfig.h
-│   └── uart.h / uart.c
-└── FreeRTOS-Kernel/           ← cloned by `make setup`
+│   └── FreeRTOSConfig.h
 ```
+
+> **Build note:** The FreeRTOS kernel and all hardware drivers come from the NXP MCUXpresso SDK. Hardware initialisation (clocks, pin-mux, LPUART4) is handled by `BOARD_InitHardware()` from the SDK board-support package. Use `PRINTF` from `fsl_debug_console.h` for all console output.
 
 ### Task and kernel object map
 
@@ -100,7 +99,8 @@ void vAperiodicHandlerTask(void *pv)
     for (;;) {
         xSemaphoreTake(xAperiodicSem, portMAX_DELAY);
         count++;
-        uart_printf("[ASYNC] button press #%lu — handled in task context\r\n", count);
+        PRINTF("[ASYNC] button press #%u -- handled in task context  t=%u ms\r\n",
+               count, (unsigned)xTaskGetTickCount());
     }
 }
 ```
@@ -109,7 +109,6 @@ void vAperiodicHandlerTask(void *pv)
 
 ```bash
 cd labs/lab03_aperiodic_server
-make setup    # first time only
 make
 make flash
 ```
@@ -152,8 +151,8 @@ void vPollingServerTask(void *pv)
         {
             if (xQueueReceive(xRequestQueue, &req, 0) != pdTRUE)
                 break;   /* queue empty — budget not consumed */
-            uart_printf("[PS] served request type=%d at t=%lu ms\r\n",
-                        req.type, xTaskGetTickCount());
+            PRINTF("[PS] served request type=%d  arrived=%u ms  served=%u ms\r\n",
+                   req.type, req.timestamp, (unsigned)xTaskGetTickCount());
         }
     }
 }
@@ -216,7 +215,7 @@ void vSensor1Task(void *pv)  /* T=100 ms, prio 3 */
         SensorReading_t r = { .sensor_id = 1, .value = raw,
                               .timestamp = xTaskGetTickCount() };
         if (xQueueSend(xPipelineQueue, &r, 0) != pdTRUE)
-            uart_printf("[S1] queue full — dropped!\r\n");
+            PRINTF("[S1] queue full -- dropped!\r\n");
     }
 }
 
@@ -240,8 +239,10 @@ void vLoggerTask(void *pv)  /* prio 1 — lowest */
     for (;;) {
         xQueueReceive(xPipelineQueue, &r, portMAX_DELAY);
         count++;
-        uart_printf("[LOG] #%lu  sensor=%d  val=%d  t=%lu ms\r\n",
-                    count, r.sensor_id, r.value, r.timestamp);
+        PRINTF("[LOG] #%u  sensor=%d  val=%d  t=%u ms\r\n",
+               count, r.sensor_id, r.value, r.timestamp);
+        if (r.value > 800)
+            xEventGroupSetBits(xPipelineEvents, BIT_ALARM);
         if ((count % 10) == 0)
             xEventGroupSetBits(xPipelineEvents, BIT_DATA_READY);
     }
@@ -266,9 +267,11 @@ void vMonitorTask(void *pv)  /* prio 2 */
             pdFALSE,  /* OR — either bit suffices */
             portMAX_DELAY);
         if (bits & BIT_DATA_READY)
-            uart_printf("[MON] 10-item batch complete\r\n");
+            PRINTF("[MON] 10-item batch complete  t=%u ms\r\n",
+                   (unsigned)xTaskGetTickCount());
         if (bits & BIT_ALARM)
-            uart_printf("[MON] ALARM: value exceeded threshold\r\n");
+            PRINTF("[MON] ALARM: value exceeded threshold  t=%u ms\r\n",
+                   (unsigned)xTaskGetTickCount());
     }
 }
 ```

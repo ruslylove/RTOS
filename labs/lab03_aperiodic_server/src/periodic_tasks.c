@@ -15,7 +15,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "periodic_tasks.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ── tau1: T = 100 ms, priority 3 ─────────────────────────────────────────── */
 void vPeriodic1Task(void *pvParameters)
@@ -31,7 +31,7 @@ void vPeriodic1Task(void *pvParameters)
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(100));
 
         count++;
-        uart_printf("[P1] period #%lu  t=%lu ms\r\n",
+        PRINTF("[P1] period #%u  t=%u ms\r\n",
                     count, (uint32_t)xTaskGetTickCount());
 
         /* TODO (optional): add a short busy-wait here to simulate
@@ -56,7 +56,7 @@ void vPeriodic2Task(void *pvParameters)
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(200));
 
         count++;
-        uart_printf("[P2] period #%lu  t=%lu ms\r\n",
+        PRINTF("[P2] period #%u  t=%u ms\r\n",
                     count, (uint32_t)xTaskGetTickCount());
     }
 }

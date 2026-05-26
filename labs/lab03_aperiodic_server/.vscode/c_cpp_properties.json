@@ -1,0 +1,42 @@
+{
+    "configurations": [
+        {
+            "name": "ARM Cortex-M33",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/rtos/freertos/freertos-kernel-upstream/include",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/rtos/freertos/freertos-kernel-upstream/portable/GCC/ARM_CM33_NTZ/non_secure",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/rtos/freertos/freertos-kernel/include",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/devices/MCX/MCXN/MCXN236",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/devices/MCX/MCXN/MCXN236/drivers",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/devices/MCX/MCXN/periph1",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/arch/arm/CMSIS/Core/Include",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/drivers/common",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/drivers/gpio",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/drivers/lpflexcomm",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/drivers/lpflexcomm/lpuart",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/components/debug_console_lite",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/components/uart",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/examples/_boards/frdmmcxn236",
+                "/Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk/examples/_boards/frdmmcxn236/freertos_examples/freertos_hello"
+            ],
+            "defines": [
+                "CPU_MCXN236VDF",
+                "MCXN236_SERIES",
+                "SDK_DEBUGCONSOLE=1",
+                "SDK_OS_FREE_RTOS",
+                "DEBUG"
+            ],
+            "compilerPath": "/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m33",
+                "-mthumb",
+                "-mfloat-abi=hard",
+                "-mfpu=fpv5-sp-d16"
+            ],
+            "cStandard": "c11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

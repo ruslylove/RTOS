@@ -45,14 +45,13 @@ When τH blocks, τL inherits τH's priority. τM cannot preempt τL. τH's bloc
 ```
 lab04_priority_inversion/
 ├── Makefile
-├── linker_MCXN236.ld
 ├── src/
 │   ├── main.c               ← task creation, kernel object init
 │   ├── inversion_tasks.c/.h ← τH, τM, τL implementations
-│   ├── FreeRTOSConfig.h
-│   └── uart.h / uart.c
-└── FreeRTOS-Kernel/
+│   └── FreeRTOSConfig.h
 ```
+
+> **Build note:** The FreeRTOS kernel and all hardware drivers come from the NXP MCUXpresso SDK. Hardware initialisation is handled by `BOARD_InitHardware()`. Use `PRINTF` from `fsl_debug_console.h` for all console output. Switch between binary semaphore and mutex by changing `#define USE_MUTEX` in `main.c`.
 
 ### Task parameters
 
@@ -73,33 +72,36 @@ In `inversion_tasks.c`, use a **binary semaphore** (`xSemaphoreCreateBinary`, pr
 ```c
 void vTaskH(void *pv)   /* prio 3 */
 {
+    vTaskDelay(pdMS_TO_TICKS(100));   /* offset: let tL grab resource first */
     TickType_t xLastWake = xTaskGetTickCount();
     for (;;) {
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(200));
         TickType_t t_arrive = xTaskGetTickCount();
-        uart_printf("[H] arrived at %lu ms\r\n", t_arrive);
+        PRINTF("[H] arrived at %u ms\r\n", t_arrive);
 
         xSemaphoreTake(xSharedResource, portMAX_DELAY);  /* may block here */
         TickType_t t_acquire = xTaskGetTickCount();
-        uart_printf("[H] acquired resource at %lu ms  (waited %lu ms)\r\n",
-                    t_acquire, t_acquire - t_arrive);
+        PRINTF("[H] acquired resource at %u ms  (waited %u ms)\r\n",
+               t_acquire, t_acquire - t_arrive);
 
         vTaskDelay(pdMS_TO_TICKS(5));   /* critical section */
         xSemaphoreGive(xSharedResource);
-        uart_printf("[H] released resource\r\n");
+        PRINTF("[H] released resource\r\n");
     }
 }
 
 void vTaskM(void *pv)   /* prio 2 */
 {
+    vTaskDelay(pdMS_TO_TICKS(50));   /* offset */
     TickType_t xLastWake = xTaskGetTickCount();
     for (;;) {
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(150));
-        uart_printf("[M] running (no resource held)\r\n");
-        /* Simulate 30 ms computation — busy-wait to prevent sleep */
+        PRINTF("[M] running (no resource held)  t=%u ms\r\n",
+               (unsigned)xTaskGetTickCount());
+        /* Busy-wait 30 ms — must stay runnable to cause inversion */
         TickType_t start = xTaskGetTickCount();
         while ((xTaskGetTickCount() - start) < pdMS_TO_TICKS(30)) {}
-        uart_printf("[M] done\r\n");
+        PRINTF("[M] done  t=%u ms\r\n", (unsigned)xTaskGetTickCount());
     }
 }
 
@@ -109,12 +111,14 @@ void vTaskL(void *pv)   /* prio 1 */
     for (;;) {
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(300));
         xSemaphoreTake(xSharedResource, portMAX_DELAY);
-        uart_printf("[L] acquired resource — holding for 40 ms\r\n");
-        /* Simulate 40 ms critical section */
+        PRINTF("[L] acquired resource -- holding for 40 ms  t=%u ms\r\n",
+               (unsigned)xTaskGetTickCount());
+        /* Busy-wait 40 ms — must stay runnable for inversion to occur */
         TickType_t start = xTaskGetTickCount();
         while ((xTaskGetTickCount() - start) < pdMS_TO_TICKS(40)) {}
         xSemaphoreGive(xSharedResource);
-        uart_printf("[L] released resource\r\n");
+        PRINTF("[L] released resource  t=%u ms\r\n",
+               (unsigned)xTaskGetTickCount());
     }
 }
 ```
@@ -124,7 +128,7 @@ void vTaskL(void *pv)   /* prio 1 */
 ### Step 2 — Build and flash
 
 ```bash
-make setup && make && make flash
+make && make flash
 ```
 
 ### Step 3 — Capture UART output

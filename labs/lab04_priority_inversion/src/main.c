@@ -17,7 +17,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
+#include "board.h"
 #include "inversion_tasks.h"
 
 /* ── Part selection ──────────────────────────────────────────────────────── */
@@ -33,7 +34,7 @@ SemaphoreHandle_t xResource2      = NULL;   /* Experiment D1 only */
 void vApplicationMallocFailedHook(void)
 {
     taskDISABLE_INTERRUPTS();
-    uart_puts("[FATAL] malloc failed\r\n");
+    PRINTF("[FATAL] malloc failed\r\n");
     for (;;) {}
 }
 
@@ -41,21 +42,20 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
     taskDISABLE_INTERRUPTS();
-    uart_printf("[FATAL] stack overflow: %s\r\n", pcTaskName);
+    PRINTF("[FATAL] stack overflow: %s\r\n", pcTaskName);
     for (;;) {}
 }
 
 /* ════════════════════════════════════════════════════════════════════════════ */
 int main(void)
 {
-    /* TODO: hw_init() — clock to 150 MHz, uart_init() */
-    uart_init();
+    BOARD_InitHardware();
 
-    uart_puts("\r\n=== RTOS Lab 04: Priority Inversion ===\r\n");
+    PRINTF("\r\n=== RTOS Lab 04: Priority Inversion ===\r\n");
 #if USE_MUTEX
-    uart_puts("[MAIN] mode: MUTEX (PIP enabled)\r\n\r\n");
+    PRINTF("[MAIN] mode: MUTEX (PIP enabled)\r\n\r\n");
 #else
-    uart_puts("[MAIN] mode: BINARY SEMAPHORE (inversion expected)\r\n\r\n");
+    PRINTF("[MAIN] mode: BINARY SEMAPHORE (inversion expected)\r\n\r\n");
 #endif
 
     /* ── Create the shared resource ─────────────────────────────────────── */
@@ -74,7 +74,7 @@ int main(void)
     xTaskCreate(vTaskM, "TaskM", 256, NULL, 2, NULL);
     xTaskCreate(vTaskL, "TaskL", 256, NULL, 1, NULL);
 
-    uart_printf("[MAIN] starting scheduler — free heap: %u bytes\r\n",
+    PRINTF("[MAIN] starting scheduler — free heap: %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     vTaskStartScheduler();

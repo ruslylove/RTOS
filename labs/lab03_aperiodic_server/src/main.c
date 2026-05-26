@@ -4,7 +4,8 @@
  * Lab 03 — Aperiodic Servers & Producer-Consumer Pipeline
  *
  * This file creates all FreeRTOS kernel objects and tasks, then starts the
- * scheduler. Hardware initialisation (clocks, GPIO, UART) is in hw_init().
+ * scheduler. Hardware initialisation is done via BOARD_InitHardware() from
+ * the NXP MCUXpresso SDK (clocks to 150 MHz, pin-mux, LPUART4 debug console).
  *
  * Parts:
  *   A — Deferred interrupt handler (xAperiodicSem, vAperiodicHandlerTask)
@@ -26,7 +27,8 @@
 #include "event_groups.h"
 
 #include "FreeRTOSConfig.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
+#include "board.h"
 #include "periodic_tasks.h"
 #include "aperiodic_handler.h"
 #include "producer_consumer.h"
@@ -55,7 +57,7 @@ static void hw_init(void);
 void vApplicationMallocFailedHook(void)
 {
     taskDISABLE_INTERRUPTS();
-    uart_puts("[FATAL] heap allocation failed\r\n");
+    PRINTF("[FATAL] heap allocation failed\r\n");
     for (;;) {}
 }
 
@@ -63,7 +65,7 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
     taskDISABLE_INTERRUPTS();
-    uart_printf("[FATAL] stack overflow in task: %s\r\n", pcTaskName);
+    PRINTF("[FATAL] stack overflow in task: %s\r\n", pcTaskName);
     for (;;) {}
 }
 
@@ -72,7 +74,7 @@ int main(void)
 {
     hw_init();
 
-    uart_puts("\r\n=== RTOS Lab 03: Aperiodic Servers & Producer-Consumer ===\r\n\r\n");
+    PRINTF("\r\n=== RTOS Lab 03: Aperiodic Servers & Producer-Consumer ===\r\n\r\n");
 
     /* ── Create kernel objects ──────────────────────────────────────────── */
 
@@ -129,8 +131,8 @@ int main(void)
      * EnableIRQ(GPIO0_IRQn);
      */
 
-    uart_printf("[MAIN] starting scheduler — free heap: %u bytes\r\n",
-                (unsigned)xPortGetFreeHeapSize());
+    PRINTF("[MAIN] starting scheduler -- free heap: %u bytes\r\n",
+           (unsigned)xPortGetFreeHeapSize());
 
     vTaskStartScheduler();
 
@@ -148,5 +150,5 @@ static void hw_init(void)
      *
      * After the clock is configured, call uart_init() to bring up LPUART4.
      */
-    uart_init();
+    BOARD_InitHardware();
 }

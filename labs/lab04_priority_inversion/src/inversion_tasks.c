@@ -21,7 +21,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "inversion_tasks.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ── Task parameters ─────────────────────────────────────────────────────── */
 #define TASK_H_PERIOD_MS      200
@@ -59,13 +59,13 @@ void vTaskH(void *pvParameters)
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TASK_H_PERIOD_MS));
 
         TickType_t t_arrive = xTaskGetTickCount();
-        uart_printf("[H] arrived at %lu ms\r\n", t_arrive);
+        PRINTF("[H] arrived at %u ms\r\n", t_arrive);
 
         /* TODO: Take the shared resource (may block if tL holds it) */
         xSemaphoreTake(xSharedResource, portMAX_DELAY);
 
         TickType_t t_acquire = xTaskGetTickCount();
-        uart_printf("[H] acquired resource at %lu ms  (waited %lu ms)\r\n",
+        PRINTF("[H] acquired resource at %u ms  (waited %u ms)\r\n",
                     t_acquire, t_acquire - t_arrive);
 
         /* Critical section */
@@ -74,7 +74,7 @@ void vTaskH(void *pvParameters)
         /* TODO: Release the shared resource */
         xSemaphoreGive(xSharedResource);
 
-        uart_printf("[H] released resource\r\n");
+        PRINTF("[H] released resource\r\n");
     }
 }
 
@@ -94,7 +94,7 @@ void vTaskM(void *pvParameters)
     {
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TASK_M_PERIOD_MS));
 
-        uart_printf("[M] running (no resource held)  t=%lu ms\r\n",
+        PRINTF("[M] running (no resource held)  t=%u ms\r\n",
                     (uint32_t)xTaskGetTickCount());
 
         /*
@@ -108,7 +108,7 @@ void vTaskM(void *pvParameters)
             /* busy wait */
         }
 
-        uart_printf("[M] done  t=%lu ms\r\n", (uint32_t)xTaskGetTickCount());
+        PRINTF("[M] done  t=%u ms\r\n", (uint32_t)xTaskGetTickCount());
     }
 }
 
@@ -131,7 +131,7 @@ void vTaskL(void *pvParameters)
         /* TODO: Acquire the shared resource */
         xSemaphoreTake(xSharedResource, portMAX_DELAY);
 
-        uart_printf("[L] acquired resource -- holding for %d ms  t=%lu ms\r\n",
+        PRINTF("[L] acquired resource -- holding for %d ms  t=%u ms\r\n",
                     CS_L_MS, (uint32_t)xTaskGetTickCount());
 
         /*
@@ -149,7 +149,7 @@ void vTaskL(void *pvParameters)
         /* TODO: Release the shared resource */
         xSemaphoreGive(xSharedResource);
 
-        uart_printf("[L] released resource  t=%lu ms\r\n",
+        PRINTF("[L] released resource  t=%u ms\r\n",
                     (uint32_t)xTaskGetTickCount());
     }
 }

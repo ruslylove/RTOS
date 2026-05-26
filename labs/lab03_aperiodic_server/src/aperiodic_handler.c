@@ -18,7 +18,7 @@
 #include "semphr.h"
 #include "queue.h"
 #include "aperiodic_handler.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* Cortex-M33 CMSIS GPIO driver (from MCUXpresso SDK) */
 #include "fsl_gpio.h"
@@ -94,7 +94,7 @@ void vAperiodicHandlerTask(void *pvParameters)
         /* TODO: Perform the aperiodic work here.
          * Keep execution time short relative to the Polling Server budget.
          * Example: read a GPIO state, update a flag, log to UART. */
-        uart_printf("[ASYNC] button press #%lu -- handled in task context  t=%lu ms\r\n",
+        PRINTF("[ASYNC] button press #%u -- handled in task context  t=%u ms\r\n",
                     count, (uint32_t)xTaskGetTickCount());
     }
 }
@@ -137,7 +137,7 @@ void vPollingServerTask(void *pvParameters)
 
             /* TODO: Process the request.
              * Log the arrival timestamp and service timestamp. */
-            uart_printf("[PS] served request type=%d  arrived=%lu ms  served=%lu ms\r\n",
+            PRINTF("[PS] served request type=%d  arrived=%u ms  served=%u ms\r\n",
                         req.type, req.timestamp, (uint32_t)xTaskGetTickCount());
         }
     }

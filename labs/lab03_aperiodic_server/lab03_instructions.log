@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.11.22)  24 MAY 2026 01:36
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.11.28)  26 MAY 2026 15:15
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1097,22 +1097,27 @@ ocal/texlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}
 {/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}{/usr/local/t
 exlive/2025/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free3.enc}{/usr/local/te
 xlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}]
-Underfull \hbox (badness 10000) in paragraph at lines 109--109
+LaTeX Font Info:    Trying to load font information for U+fontawesomefree1 on i
+nput line 100.
+
+(/usr/local/texlive/2025/texmf-dist/tex/latex/fontawesome5/ufontawesomefree1.fd
+)
+Underfull \hbox (badness 10000) in paragraph at lines 113--113
 []|\T1/lmr/m/n/10.95 (+20) Task prio 3,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 110--110
+Underfull \hbox (badness 10000) in paragraph at lines 114--114
 []|\T1/lmr/m/n/10.95 (+20) Task prio 2,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 115--115
+Underfull \hbox (badness 10000) in paragraph at lines 119--119
 []|\T1/lmr/m/n/10.95 (+20) Task prio 3,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 116--116
+Underfull \hbox (badness 10000) in paragraph at lines 120--120
 []|\T1/lmr/m/n/10.95 (+20) Task prio 2,
  []
 
@@ -1123,22 +1128,23 @@ File: lstlang1.sty 2024/09/23 1.10c listings language file
 File: lstmisc.sty 2024/09/23 1.10c (Carsten Heinz)
 )
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 136.
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 140.
 
 
-[2] (/usr/local/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
+[2{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free1.enc
+}] (/usr/local/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2024/09/23 1.10c listings language file
 )
 (/usr/local/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2024/09/23 1.10c listings language file
 )
 LaTeX Font Info:    Trying to load font information for U+fontawesomefree0 on i
-nput line 169.
+nput line 172.
 
 (/usr/local/texlive/2025/texmf-dist/tex/latex/fontawesome5/ufontawesomefree0.fd
 )
 LaTeX Font Info:    Trying to load font information for U+fontawesomefree2 on i
-nput line 174.
+nput line 177.
 
 (/usr/local/texlive/2025/texmf-dist/tex/latex/fontawesome5/ufontawesomefree2.fd
 )
@@ -1146,24 +1152,18 @@ nput line 174.
 [3{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free0.enc
 }{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free2.enc}
 {/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}]
-LaTeX Font Info:    Trying to load font information for U+fontawesomefree1 on i
-nput line 222.
 
-(/usr/local/texlive/2025/texmf-dist/tex/latex/fontawesome5/ufontawesomefree1.fd
-)
-
-[4{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/fontawesome5/fa5free1.enc
-}{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}]
+[4{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}]
 
 [5]
 
 [6]
-Underfull \hbox (badness 10000) in paragraph at lines 467--469
+Underfull \hbox (badness 10000) in paragraph at lines 474--476
 []|\T1/lmtt/m/n/10.95 xSemaphoreGiveFromISR\T1/lmr/m/n/10.95 (+20) ,
  []
 
 
-Underfull \hbox (badness 1168) in paragraph at lines 467--469
+Underfull \hbox (badness 1168) in paragraph at lines 474--476
 \T1/lmtt/m/n/10.95 xQueueSendFromISR\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.9
 5 xEventGroupSetBits\T1/lmr/m/n/10.95 (+20) ,
  []
@@ -1181,11 +1181,11 @@ Package rerunfilecheck Info: File `lab03_instructions.out' has not changed.
 (rerunfilecheck)             Checksum: 81460EA8C665B4B52E656A6C6A665B49;3441.
  ) 
 Here is how much of TeX's memory you used:
- 34533 strings out of 473190
- 691245 string characters out of 5715799
- 1570925 words of memory out of 5000000
- 56951 multiletter control sequences out of 15000+600000
- 613185 words of font info for 124 fonts, out of 8000000 for 9000
+ 34536 strings out of 473190
+ 691287 string characters out of 5715799
+ 1572946 words of memory out of 5000000
+ 56952 multiletter control sequences out of 15000+600000
+ 613268 words of font info for 125 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  121i,13n,124p,1207b,2148s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/fontawesome5/FontAweso
@@ -1201,7 +1201,7 @@ nts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/
 public/lm/lmtk10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/lm/
 lmtt10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/lm/lmtt9.pfb>
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/lm/lmtti10.pfb>
-Output written on lab03_instructions.pdf (8 pages, 346819 bytes).
+Output written on lab03_instructions.pdf (8 pages, 346480 bytes).
 PDF statistics:
  432 PDF objects out of 1000 (max. 8388607)
  362 compressed objects within 4 object streams
