@@ -12,8 +12,7 @@
  *     Acquires xUartMutex before printing to prevent interleaving.
  *
  *   vStatusTask  (LOW prio, blocks on semaphore)
- *     Prints a system status report whenever the software timer
- *     fires and gives xStatusSem.
+ *     Prints a system status report whenever the software timer fires.
  *
  *   Software timer (1000 ms, auto-reload)
  *     Gives xStatusSem from its callback, waking vStatusTask.
@@ -21,23 +20,22 @@
  * Concepts demonstrated
  *   Tasks & scheduling  — three tasks with different priorities
  *   Queue               — xSensorQueue (Sensor → Display)
- *   Semaphore           — xStatusSem (timer ISR-context → task)
- *   Mutex               — xUartMutex (UART critical section)
+ *   Semaphore           — xStatusSem (timer callback → task)
+ *   Mutex               — xUartMutex (PRINTF critical section)
  */
 
 #include "lab_tasks.h"
-#include "uart.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
 #include "timers.h"
+#include "fsl_debug_console.h"
 
-/* ──────────────────────────────────────────────────────────────────────────
- * vSensorTask — HIGH priority
- * Period: 500 ms, uses vTaskDelayUntil for drift-free timing.
+/* ── vSensorTask ─────────────────────────────────────────────────────────────
+ * HIGH priority, 500 ms period via vTaskDelayUntil.
  * Sends one SensorReading_t per period to xSensorQueue.
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 void vSensorTask(void *pvParams)
 {
     (void)pvParams;
@@ -47,19 +45,16 @@ void vSensorTask(void *pvParams)
     int32_t raw = 0;
 
     for (;;) {
-        /* Simulate an ADC reading that oscillates between 0 and 100 */
-        raw = (raw + 7) % 101;
+        raw = (raw + 7) % 101;   /* oscillates 0..100 */
 
         SensorReading_t reading = {
             .timestamp_ms = xTaskGetTickCount() * portTICK_PERIOD_MS,
             .value        = raw,
         };
 
-        /* Non-blocking send: if queue is full, the reading is dropped */
         if (xQueueSend(xSensorQueue, &reading, 0) != pdTRUE) {
-            /* Queue full — take mutex and warn once */
             if (xSemaphoreTake(xUartMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                uart_puts("[SENSOR] Queue full — reading dropped!\n");
+                PRINTF("[SENSOR] Queue full — reading dropped!\r\n");
                 xSemaphoreGive(xUartMutex);
             }
         }
@@ -68,11 +63,10 @@ void vSensorTask(void *pvParams)
     }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * vDisplayTask — MEDIUM priority
- * Blocks on xSensorQueue indefinitely.  When a reading arrives it locks
- * xUartMutex and prints, then releases the mutex.
- * ────────────────────────────────────────────────────────────────────────── */
+/* ── vDisplayTask ────────────────────────────────────────────────────────────
+ * MEDIUM priority. Blocks on xSensorQueue indefinitely.
+ * Locks xUartMutex before printing to avoid interleaving with vStatusTask.
+ * ──────────────────────────────────────────────────────────────────────────── */
 void vDisplayTask(void *pvParams)
 {
     (void)pvParams;
@@ -80,43 +74,38 @@ void vDisplayTask(void *pvParams)
     SensorReading_t reading;
 
     for (;;) {
-        /* Block until a reading arrives */
         if (xQueueReceive(xSensorQueue, &reading, portMAX_DELAY) == pdTRUE) {
-
-            /* Mutex: protect UART from concurrent access by vStatusTask */
             xSemaphoreTake(xUartMutex, portMAX_DELAY);
-            uart_printf("[DISPLAY] t=%u ms  value=%d\n",
-                        reading.timestamp_ms, reading.value);
+            PRINTF("[DISPLAY] t=%u ms  value=%d\r\n",
+                   (unsigned)reading.timestamp_ms, (int)reading.value);
             xSemaphoreGive(xUartMutex);
         }
     }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * vStatusTask — LOW priority
- * Blocks on xStatusSem.  The software timer gives the semaphore every 1 s,
- * waking this task to print a status snapshot.
- * ────────────────────────────────────────────────────────────────────────── */
+/* ── vStatusTask ─────────────────────────────────────────────────────────────
+ * LOW priority. Blocks on xStatusSem.
+ * The software timer gives the semaphore every 1 s, waking this task.
+ * ──────────────────────────────────────────────────────────────────────────── */
 void vStatusTask(void *pvParams)
 {
     (void)pvParams;
 
     for (;;) {
-        /* Block until the timer fires */
         xSemaphoreTake(xStatusSem, portMAX_DELAY);
 
         xSemaphoreTake(xUartMutex, portMAX_DELAY);
-        uart_printf("\n[STATUS] uptime=%u ms  queue_waiting=%u\n",
-                    xTaskGetTickCount() * portTICK_PERIOD_MS,
-                    uxQueueMessagesWaiting(xSensorQueue));
+        PRINTF("\r\n[STATUS] uptime=%u ms  queue_waiting=%u\r\n",
+               (unsigned)(xTaskGetTickCount() * portTICK_PERIOD_MS),
+               (unsigned)uxQueueMessagesWaiting(xSensorQueue));
         xSemaphoreGive(xUartMutex);
     }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * vStatusTimerCallback — runs in timer-task context (not an ISR).
+/* ── vStatusTimerCallback ────────────────────────────────────────────────────
+ * Runs in timer-task context (not an ISR).
  * Gives xStatusSem to wake vStatusTask.
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 void vStatusTimerCallback(TimerHandle_t xTimer)
 {
     (void)xTimer;

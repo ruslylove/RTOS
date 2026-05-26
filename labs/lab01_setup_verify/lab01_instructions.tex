@@ -22,6 +22,7 @@
 \usepackage{fontawesome5}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{amsmath}
 
 % ── Colors (KMUTNB brand) ──────────────────────────────────────────────────────
 \definecolor{kmutnbBlue}{RGB}{0,56,116}
@@ -189,12 +190,12 @@
 \vspace{0.3cm}
 
 \begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
-  \textbf{Platform}     & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 96\,MHz) \\[2pt]
-  \textbf{RTOS}         & FreeRTOS (bare-metal, no SDK) \\[2pt]
-  \textbf{Toolchain}    & ARM GNU Toolchain (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
-  \textbf{Tools}        & pyocd, SEGGER SystemView \\[2pt]
+  \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
+  \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
+  \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+  \textbf{Flash / Debug}  & LinkServer (\texttt{/Applications/LinkServer\_26.3.123/}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
-  \textbf{CLO mapping}  & CLO\,1 (foundations) \enspace CLO\,3 (FreeRTOS implementation) \\
+  \textbf{CLO mapping}    & CLO\,1 (foundations) \enspace CLO\,3 (FreeRTOS implementation) \\
 \end{tabular}
 
 \vspace{0.4cm}
@@ -205,54 +206,64 @@
 By completing this lab you will be able to:
 
 \begin{enumerate}[noitemsep, leftmargin=*]
-  \item Build and flash a bare-metal FreeRTOS project using the ARM cross-compiler toolchain.
-  \item Verify that FreeRTOS creates and schedules tasks correctly by reading UART output.
-  \item Integrate SEGGER SystemView into a FreeRTOS project and capture a real-time trace.
-  \item Identify task context switches on the SystemView timeline.
+  \item Build a FreeRTOS project using the NXP MCUXpresso SDK and ARM cross-compiler.
+  \item Flash firmware and monitor the board using LinkServer.
+  \item Verify that FreeRTOS creates and schedules tasks correctly via UART output
+        and a physical LED.
   \item Observe how task priority affects scheduling --- the foundation for Module~2.
+  \item Identify and prevent a race condition on a shared resource using a mutex.
 \end{enumerate}
 
 % ── Prerequisites ─────────────────────────────────────────────────────────────
 \section{Prerequisites}
 
-Complete the \textbf{Lab 1 Setup Guide} (\file{lab01\_setup\_guide.md}) before starting:
+Before starting, confirm these are in place:
 
 \begin{checklist}
-  \item ARM GNU Toolchain installed; \texttt{arm-none-eabi-gcc} is on \texttt{PATH}
-        (or toolchain path set in \file{Makefile})
-  \item \texttt{pyocd} installed (\texttt{pip install pyocd})
+  \item ARM GNU Toolchain 12 installed; \texttt{arm-none-eabi-gcc} available at\\
+        \texttt{/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin}\\
+        (or update \texttt{TOOLCHAIN} in \file{Makefile})
+  \item NXP MCUXpresso SDK extracted; update \texttt{SDK\_ROOT} in \file{Makefile} if needed
+  \item \textbf{LinkServer} installed: \texttt{/Applications/LinkServer\_26.3.123/LinkServer}
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
-  \item MCU-Link firmware \textbf{re-flashed to J-Link} (Setup Guide Step~3)
-  \item SEGGER SystemView installed on your laptop
+  \item Python~3 + \texttt{pyserial} for serial monitoring (\texttt{pip3 install pyserial})
 \end{checklist}
+
+\begin{warnbox}
+  This lab uses \textbf{LinkServer} (NXP's native flash/debug tool) ---
+  not pyocd or J-Link. The board does \textbf{not} need its MCU-Link firmware
+  reflashed. LinkServer works with the factory-default MCU-Link firmware.
+\end{warnbox}
 
 % ── Project Structure ─────────────────────────────────────────────────────────
 \section{Project Structure}
 
 \begin{lstlisting}[style=textstyle]
 lab01_setup_verify/
-  Makefile                  <- build, flash, and debug targets
-  linker_MCXN236.ld         <- flash/RAM memory map
+  Makefile                      <- build, flash, debug targets
   src/
-    startup_MCXN236.s       <- vector table + Reset_Handler
-    main.c                  <- hw_init, tasks, scheduler start
-    FreeRTOSConfig.h        <- kernel configuration
-    uart.h / uart.c         <- bare-metal LPUART4 driver
-    SystemView/             <- (created in Part C -- you add these)
-  FreeRTOS-Kernel/          <- (cloned in Part A)
+    main.c                      <- task definitions, LED init, scheduler start
+    FreeRTOSConfig.h            <- kernel configuration
+  <SDK_ROOT>/                   <- board support, FreeRTOS kernel, drivers (external)
+    rtos/freertos/freertos-kernel-upstream/   <- FreeRTOS kernel
+    devices/MCX/MCXN/MCXN236/               <- device startup + linker script
+    examples/_boards/frdmmcxn236/            <- board.h, clock_config, pin_mux
 \end{lstlisting}
+
+The build pulls all SDK sources directly from \texttt{SDK\_ROOT} in the Makefile ---
+there is nothing to clone or install separately.
 
 \subsection{What the code does}
 
-Two FreeRTOS tasks run in this lab:
+Two FreeRTOS tasks run continuously after the scheduler starts:
 
 \renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{} l c c p{6.5cm} @{}}
+\begin{tabular}{@{} l c c p{6cm} @{}}
   \toprule
   \textbf{Task} & \textbf{Priority} & \textbf{Period} & \textbf{What it does} \\
   \midrule
   \texttt{vBlinkTask}     & 2 (HIGH) & 500\,ms  &
-    Prints \texttt{LED ON} / \texttt{LED OFF} plus a toggle counter \\
+    Toggles the \textbf{physical red LED} (PIO4\_18) and prints \texttt{LED ON/OFF} \\
   \texttt{vHeartbeatTask} & 1 (LOW)  & 1000\,ms &
     Prints the FreeRTOS tick uptime in milliseconds \\
   \bottomrule
@@ -260,71 +271,94 @@ Two FreeRTOS tasks run in this lab:
 \renewcommand{\arraystretch}{1}
 
 \medskip
-A shared \textbf{UART mutex} (\api{xUartMutex}) prevents the two tasks from printing
-at the same time --- the simplest possible example of a critical section.
+A shared \textbf{UART mutex} (\api{xUartMutex}) prevents both tasks from calling
+\api{PRINTF} simultaneously --- the simplest possible example of a critical section.
 
-The key hardware initialisation in \file{main.c} switches the MCXN236 core clock from
-the default FRO 12\,MHz to FRO 96\,MHz before the scheduler starts, so that
-\texttt{configCPU\_CLOCK\_HZ} matches the actual oscillator.
+\begin{tipbox}
+  \textbf{Hardware note:} The red LED is active-low on GPIO4 pin~18 (board pad N10).\\
+  \texttt{LOGIC\_LED\_ON = 0} (GPIO low $\to$ LED on),
+  \texttt{LOGIC\_LED\_OFF = 1} (GPIO high $\to$ LED off).\\
+  \api{LED\_RED\_TOGGLE()} is a macro defined in the SDK's \file{board.h}.
+\end{tipbox}
 
 % ── Part A ─────────────────────────────────────────────────────────────────────
 \section{Part A --- Build and Flash}
 
-\subsection{Step 1 --- Clone FreeRTOS-Kernel}
+\subsection{Step 1 --- Build}
 
 \begin{lstlisting}[style=bashstyle]
 cd labs/lab01_setup_verify
-make setup
-\end{lstlisting}
-
-This runs \texttt{git clone --depth=1} to fetch the FreeRTOS kernel source into
-\file{FreeRTOS-Kernel/}.  You only need to do this once.
-
-\subsection{Step 2 --- Build}
-
-\begin{lstlisting}[style=bashstyle]
 make
 \end{lstlisting}
 
 Expected output (sizes will vary slightly):
 
 \begin{lstlisting}[style=textstyle]
-arm-none-eabi-gcc  ...  -o lab01.elf
+arm-none-eabi-gcc ... -o lab01.elf
 arm-none-eabi-objcopy -O binary lab01.elf lab01.bin
 arm-none-eabi-size lab01.elf
    text    data     bss     dec     hex filename
-  12xxx     xxx   xxxxx   xxxxx    xxxx lab01.elf
+  31588      20   16060   47668    ba34 lab01.elf
 \end{lstlisting}
 
 \begin{warnbox}
-  If \texttt{arm-none-eabi-gcc: not found}, either add the toolchain directory to
-  \texttt{PATH}, or set the path at the top of \file{Makefile}:
-  \begin{lstlisting}[style=bashstyle, aboveskip=0pt, belowskip=0pt]
-  TOOLCHAIN ?= /path/to/arm-none-eabi/bin
-  \end{lstlisting}
+  \textbf{Toolchain not found:} Edit the \texttt{TOOLCHAIN} variable at the top of
+  \file{Makefile} to point to your \texttt{arm-none-eabi-gcc} installation directory.
+
+  \medskip
+  \textbf{SDK not found:} Edit \texttt{SDK\_ROOT} in \file{Makefile} to match
+  where you extracted the NXP MCUXpresso SDK.
 \end{warnbox}
 
-\subsection{Step 3 --- Flash}
+\subsection{Step 2 --- Flash}
 
-Connect the board, then:
+Connect the board via the MCU-LINK USB port, then:
 
 \begin{lstlisting}[style=bashstyle]
 make flash
 \end{lstlisting}
 
-pyocd erases, programs, and resets the MCU.  The board starts running immediately.
+This calls LinkServer to erase, program, and reset the MCU.
+Look for \texttt{Finished writing Flash successfully} in the output.
+The board starts running immediately after the reset.
+
+\begin{tipbox}
+  \textbf{Alternative --- pyocd:} pyocd is available in a virtualenv at\\
+  \texttt{/Users/rus/Development/nxp\_test/.venv/bin/pyocd}\\
+  Activate it first, then run: \texttt{pyocd flash lab01.elf -t mcxn236}
+\end{tipbox}
 
 % ── Part B ─────────────────────────────────────────────────────────────────────
-\section{Part B --- UART Output Verification}
+\section{Part B --- Verify: UART Output and LED}
 
-Open a serial terminal on your laptop.  The board exposes a CDC-ACM virtual COM port
-over the same USB cable used for flashing.
+\subsection{Serial terminal}
 
-\textbf{macOS / Linux:}
+The board exposes a USB-CDC virtual COM port over the MCU-LINK USB cable.
+
+\textbf{Find the port:}
 \begin{lstlisting}[style=bashstyle]
-ls /dev/tty.usbmodem*        # find the port
-screen /dev/tty.usbmodemXXXX 115200
-# or: minicom -b 115200 -D /dev/tty.usbmodemXXXX
+ls /dev/cu.usbmodem*
+# Example output: /dev/cu.usbmodemLBAZMNNVFKEDG3
+\end{lstlisting}
+
+\textbf{Monitor with screen:}
+\begin{lstlisting}[style=bashstyle]
+screen /dev/cu.usbmodemXXXXXX 115200
+# Press Ctrl-A then Ctrl-\ to quit
+\end{lstlisting}
+
+\textbf{Or with Python (clean, non-garbled capture):}
+\begin{lstlisting}[style=bashstyle]
+python3 -c "
+import serial, time, sys
+s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s.reset_input_buffer()
+end = time.time() + 10
+while time.time() < end:
+    d = s.read(256)
+    if d: sys.stdout.buffer.write(d); sys.stdout.buffer.flush()
+s.close()
+"
 \end{lstlisting}
 
 \textbf{Windows:} PuTTY or Tera Term --- \texttt{COMx}, 115200\,baud, 8N1.
@@ -333,118 +367,50 @@ screen /dev/tty.usbmodemXXXX 115200
 
 \begin{lstlisting}[style=textstyle]
 === RTOS Lab 01: Toolchain & Environment Verify ===
+SDK: BOARD_InitHardware + PRINTF  |  CPU: PLL 150 MHz
 Tasks: Blink (500 ms) | Heartbeat (1000 ms)
-SystemView: disabled (rebuild with: make SYSVIEW=1)
 
 [MAIN] Starting scheduler...
 
 [BLINK] LED ON   (toggle #1)
 [BLINK] LED OFF  (toggle #2)
-[HB]    uptime = 1000 ms
+[HB]    uptime = 1003 ms
 [BLINK] LED ON   (toggle #3)
 [BLINK] LED OFF  (toggle #4)
-[HB]    uptime = 2000 ms
+[HB]    uptime = 2007 ms
 \end{lstlisting}
 
 \begin{tipbox}
-  \textbf{Key observations:}
+  \textbf{What to observe:}
   \begin{itemize}[noitemsep]
     \item \texttt{[BLINK]} prints \emph{twice} for every one \texttt{[HB]} line,
           reflecting 500\,ms vs.\ 1000\,ms periods.
-    \item Uptime increments by exactly 1000\,ms each line --- the FreeRTOS 1\,kHz
-          tick is running correctly.
+    \item Uptime increments by approximately 1000\,ms per \texttt{[HB]} line.
+    \item The \textbf{red LED} on the board blinks visibly at 2\,Hz
+          (500\,ms on, 500\,ms off).
+    \item Output never garbles --- the mutex serialises both tasks' \api{PRINTF} calls.
   \end{itemize}
 \end{tipbox}
 
 \begin{checkpointbox}
-  Show a terminal capture of at least 5 seconds of output to your instructor.
+  Capture at least 5 seconds of terminal output \textbf{and} photograph the blinking LED.
 \end{checkpointbox}
 
 % ── Part C ─────────────────────────────────────────────────────────────────────
-\section{Part C --- SEGGER SystemView Integration}
+\section{Part C --- Experiments}
 
-The setup guide (Step~4) covers the SystemView integration in detail.  Follow the
-steps below to add the source files to \file{src/SystemView/} and rebuild with the
-\texttt{SYSVIEW=1} flag.
-
-\subsection{Step 1 --- Copy SystemView source files}
-
-Locate your SystemView installation.  On macOS it is typically:
-\begin{lstlisting}[style=textstyle]
-/Applications/SEGGER/SystemView_V3xx/Src/
-\end{lstlisting}
-
-Create the folder \file{src/SystemView/} and copy:
-
-\begin{lstlisting}[style=textstyle]
-SEGGER_SYSVIEW.c                        SEGGER_SYSVIEW.h
-SEGGER_SYSVIEW_ConfDefaults.h           SEGGER_SYSVIEW_Int.h
-SEGGER_RTT.c                            SEGGER_RTT.h
-SEGGER_RTT_Conf.h                       SEGGER_RTT_printf.c
-Config/SEGGER_SYSVIEW_Config_FreeRTOS.c
-Sample/OS/SEGGER_SYSVIEW_FreeRTOS.h
-\end{lstlisting}
-
-\subsection{Step 2 --- Configure the target descriptor}
-
-Open \file{src/SystemView/SEGGER\_SYSVIEW\_Config\_FreeRTOS.c} and update:
-
-\begin{lstlisting}[style=cstyle]
-#define SYSVIEW_APP_NAME    "Lab 01 -- Setup Verify"
-#define SYSVIEW_DEVICE_NAME "Cortex-M33"
-#define SYSVIEW_RAM_BASE    0x20000000u
-\end{lstlisting}
-
-\subsection{Step 3 --- Build with SystemView enabled}
-
-\begin{lstlisting}[style=bashstyle]
-make sysview      # equivalent to:  make SYSVIEW=1
-\end{lstlisting}
-
-The Makefile adds \texttt{-DUSE\_SYSVIEW} and compiles the SystemView source files
-automatically.  \file{main.c} calls \api{SEGGER\_SYSVIEW\_Conf()} before
-\api{vTaskStartScheduler()} when this flag is set.
-
-\subsection{Step 4 --- Capture a trace}
-
-\begin{enumerate}[noitemsep, leftmargin=*]
-  \item Flash the new binary:
-        \begin{lstlisting}[style=bashstyle, aboveskip=2pt, belowskip=2pt]
-make SYSVIEW=1 flash
-        \end{lstlisting}
-  \item Open \textbf{SEGGER SystemView} on your laptop.
-  \item Go to \textbf{Target $\to$ Start Recording}.
-  \item Enter connection parameters:
-        \textbf{Target Device:}~\texttt{MCXN236} \enspace
-        \textbf{Interface:}~\texttt{SWD} \enspace
-        \textbf{Speed:}~\texttt{Auto}
-  \item Click \textbf{OK}.
-\end{enumerate}
-
-You should see the real-time Gantt chart with \texttt{Blink} and \texttt{HB} tasks
-alternating every 500\,ms and 1000\,ms.
-
-\begin{checkpointbox}
-  Screenshot the SystemView timeline showing both tasks over at least 2 seconds of
-  recording.
-\end{checkpointbox}
-
-% ── Part D ─────────────────────────────────────────────────────────────────────
-\section{Part D --- Experiments}
-
-Work through the experiments in order.  For each one, record what you observe (terminal
-output or SystemView screenshot) and answer the question that follows.
+Work through these in order.  Record UART output for each one.
 
 \subsection{Experiment 1 --- Priority swap}
 
 In \file{main.c}, swap the task priorities:
 
 \begin{lstlisting}[style=cstyle]
-xTaskCreate(vBlinkTask,     "Blink", configMINIMAL_STACK_SIZE, NULL, 1, NULL); /* was 2 */
-xTaskCreate(vHeartbeatTask, "HB",    configMINIMAL_STACK_SIZE, NULL, 2, NULL); /* was 1 */
+xTaskCreate(vBlinkTask,     "Blink", 512, NULL, 1, NULL); /* was 2 */
+xTaskCreate(vHeartbeatTask, "HB",    512, NULL, 2, NULL); /* was 1 */
 \end{lstlisting}
 
-Rebuild, flash, and observe.
+Rebuild (\texttt{make}), flash, and observe the serial output.
 
 \begin{questionbox}
   Does the output order or timing change?  Why or why not?
@@ -458,59 +424,54 @@ Rebuild, flash, and observe.
 Set both tasks to the same priority:
 
 \begin{lstlisting}[style=cstyle]
-xTaskCreate(vBlinkTask,     "Blink", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-xTaskCreate(vHeartbeatTask, "HB",    configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+xTaskCreate(vBlinkTask,     "Blink", 512, NULL, 1, NULL);
+xTaskCreate(vHeartbeatTask, "HB",    512, NULL, 1, NULL);
 \end{lstlisting}
 
 \begin{questionbox}
   What scheduling policy does FreeRTOS apply when two tasks have equal priority and are
-  both ready?  Where exactly in \file{FreeRTOSConfig.h} is this behaviour configured?
+  both ready?  Where in \file{FreeRTOSConfig.h} is this policy enabled?
 \end{questionbox}
 
 \subsection{Experiment 3 --- Periods and CPU load}
 
-Restore the original priorities (Blink~= 2, HB~= 1).  Change
-\texttt{vBlinkTask}'s period from 500\,ms to 50\,ms:
+Restore original priorities (Blink~= 2, HB~= 1).
+Change \texttt{vBlinkTask}'s delay from 500\,ms to \textbf{50\,ms}:
 
 \begin{lstlisting}[style=cstyle]
 vTaskDelay(pdMS_TO_TICKS(50));
 \end{lstlisting}
 
-Rebuild and capture a SystemView trace.
+Rebuild and flash.  The red LED should now blink at 10\,Hz.
 
 \begin{questionbox}
-  Open the \textbf{CPU Load} view in SystemView (\textbf{View $\to$ CPU Load}).
-  What fraction of CPU time does \texttt{Blink} consume?
+  Using the utilization formula $U = C/T$, estimate the CPU load of
+  \texttt{vBlinkTask}. $C$~is the time spent executing (very short --- one
+  \api{PRINTF} call); $T = 50$\,ms.
 
-  Now compute the utilization by hand using:
-  \[
-    U \;=\; \frac{C_{\text{Blink}}}{T_{\text{Blink}}} + \frac{C_{\text{HB}}}{T_{\text{HB}}}
-  \]
-  Estimate $C_i$ from the trace.  Do the measured and computed values agree?
-  Explain any discrepancy.
+  Does the scheduler still meet the 1000\,ms heartbeat deadline?  Why?
 \end{questionbox}
 
-\subsection{Experiment 4 --- Remove the mutex (observe the problem)}
+\subsection{Experiment 4 --- Remove the mutex (observe the race)}
 
-Keep the 50\,ms Blink period from Experiment~3.  In both task bodies, comment out the
-\api{xSemaphoreTake} / \api{xSemaphoreGive} calls (keep the \api{uart\_printf} lines):
+Keep the 50\,ms Blink period from Experiment~3.  In both task bodies, comment out
+the \api{xSemaphoreTake} / \api{xSemaphoreGive} lines around \api{PRINTF}:
 
 \begin{lstlisting}[style=cstyle]
 /* xSemaphoreTake(xUartMutex, portMAX_DELAY); */
-uart_printf("[BLINK] ...\n");
+PRINTF("[BLINK] LED %s  (toggle #%u)\r\n", state, (unsigned)count);
 /* xSemaphoreGive(xUartMutex); */
 \end{lstlisting}
 
 \begin{questionbox}
-  Do you observe corrupted or interleaved output on the terminal?
+  Do you observe garbled or interleaved output on the terminal?
 
-  Why is this a \textbf{race condition} even on a \emph{single-core} microcontroller?
-  What category of kernel primitive fixes it, and exactly what resource does the mutex
-  protect here?
+  Why is this a \textbf{race condition} even on a \emph{single-core} MCU?
+  What property of a mutex prevents it?
 \end{questionbox}
 
 \begin{warnbox}
-  Restore the mutex calls before submitting your work.
+  Restore the mutex calls before submitting.
 \end{warnbox}
 
 % ── Deliverables ───────────────────────────────────────────────────────────────
@@ -523,9 +484,9 @@ Submit the following to the course LMS by the posted deadline:
   \toprule
   \textbf{\#} & \textbf{Item} & \textbf{Details} \\
   \midrule
-  1 & Terminal capture  & 5+ seconds showing correct \texttt{[BLINK]} / \texttt{[HB]} output \\
-  2 & SystemView screenshot & Timeline with both tasks, $\geq$ 2 seconds of recording \\
-  3 & Answers to Q1--Q4 & A few sentences each; reference the code or trace \\
+  1 & Terminal capture    & 5+ seconds of correct \texttt{[BLINK]} / \texttt{[HB]} output \\
+  2 & LED photo           & Board with red LED visibly on or blinking \\
+  3 & Answers to Q1--Q4  & A few sentences each; reference the code or output \\
   4 & Modified \file{main.c} & From Experiment~3 (50\,ms Blink, mutex restored) \\
   \bottomrule
 \end{tabular}
@@ -539,12 +500,12 @@ Submit the following to the course LMS by the posted deadline:
   \toprule
   \textbf{Concept} & \textbf{Where you saw it} \\
   \midrule
-  Preemptive, priority-based scheduling & Priority swap (Experiment~1) \\
-  Time-slicing among equal-priority tasks & Equal priority (Experiment~2) \\
-  CPU utilization $U = C/T$ & CPU Load view (Experiment~3) \\
-  Race condition on a shared resource & Mutex removal (Experiment~4) \\
-  Mutex as a critical-section guard & \api{xUartMutex} throughout \\
-  Periodic task with \api{vTaskDelay} & \texttt{vBlinkTask}, \texttt{vHeartbeatTask} \\
+  Preemptive, priority-based scheduling    & Priority swap (Experiment~1) \\
+  Time-slicing among equal-priority tasks  & Equal priority (Experiment~2) \\
+  CPU utilization $U = C/T$               & Short-period Blink (Experiment~3) \\
+  Race condition on a shared resource      & Mutex removal (Experiment~4) \\
+  Mutex as a critical-section guard        & \api{xUartMutex} throughout \\
+  Periodic task with \api{vTaskDelay}      & \texttt{vBlinkTask}, \texttt{vHeartbeatTask} \\
   \bottomrule
 \end{tabular}
 \renewcommand{\arraystretch}{1}
@@ -553,6 +514,62 @@ Submit the following to the course LMS by the posted deadline:
 These are the building blocks for Module~2 (scheduling theory) and Module~3
 (synchronisation).
 
+% ── Implementation Notes ───────────────────────────────────────────────────────
+\section{Implementation Notes}
+
+\subsection{Why \texttt{configRUN\_FREERTOS\_SECURE\_ONLY 1}}
+
+The MCXN236 boots and runs entirely in the ARM \textbf{secure world}.
+The FreeRTOS ARM\_CM33\_NTZ port must know this to set the correct
+\texttt{EXC\_RETURN} value when launching the first task:
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} l l c p{5cm} @{}}
+  \toprule
+  \textbf{Config} & \textbf{EXC\_RETURN} & \textbf{Bit[6]} & \textbf{Result} \\
+  \midrule
+  \texttt{configRUN\_FREERTOS\_SECURE\_ONLY 0} (default)
+    & \texttt{0xFFFFFFBC} & 0 -- non-secure
+    & Immediate fault: CPU is actually in secure mode \\
+  \texttt{configRUN\_FREERTOS\_SECURE\_ONLY 1}
+    & \texttt{0xFFFFFFFD} & 1 -- secure
+    & First task starts correctly \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\medskip
+Without this setting the scheduler appears to start (the banner prints) but
+no tasks ever execute --- the symptom is total silence after
+\texttt{[MAIN] Starting scheduler...}
+
+\subsection{Why the SDK FreeRTOS kernel}
+
+This lab uses the NXP SDK's \texttt{freertos-kernel-upstream}
+(inside \texttt{SDK\_ROOT/rtos/freertos/}) rather than a standalone clone.
+The SDK kernel is the version NXP has tested against this chip and BSP.
+A development-branch clone may have incompatible \file{portasm.c} changes that
+interact badly with the secure-world boot sequence.
+
+\subsection{LED hardware}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} l c c c c @{}}
+  \toprule
+  \textbf{LED} & \textbf{GPIO} & \textbf{Pin} & \textbf{Board pad} & \textbf{Active level} \\
+  \midrule
+  Red   & GPIO4 & 18 & N10 & Low (0 = ON) \\
+  Blue  & GPIO4 & 17 & R9  & Low (0 = ON) \\
+  Green & GPIO4 & 19 & R10 & Low (0 = ON) \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\medskip
+All three share GPIO4. The pin mux is set to \texttt{kPORT\_MuxAlt0}
+(GPIO function) in \file{main.c} before the scheduler starts,
+using \api{PORT\_SetPinConfig} and \api{GPIO\_PinInit}.
+
 % ── Reference ─────────────────────────────────────────────────────────────────
 \section{Reference}
 
@@ -560,14 +577,16 @@ These are the building blocks for Module~2 (scheduling theory) and Module~3
   \toprule
   \textbf{Resource} & \textbf{Relevant sections} \\
   \midrule
-  Barry, \textit{Mastering the FreeRTOS Kernel} &
-    Ch.~1 (tasks), Ch.~3 (queue/semaphore basics) \\
-  Laplante, \textit{Real-Time Systems Design} &
-    Ch.~1--2 (task model, deadline classes) \\
-  FreeRTOS documentation &
-    \api{xTaskCreate}, \api{vTaskDelay}, \api{xSemaphoreCreateMutex} \\
-  SEGGER SystemView User Guide &
-    Recording setup, CPU Load view \\
+  Barry, \textit{Mastering the FreeRTOS Kernel}
+    & Ch.~1 (tasks), Ch.~3 (queue/semaphore basics) \\
+  Laplante, \textit{Real-Time Systems Design}
+    & Ch.~1--2 (task model, deadline classes) \\
+  FreeRTOS documentation
+    & \api{xTaskCreate}, \api{vTaskDelay}, \api{xSemaphoreCreateMutex} \\
+  NXP AN13036
+    & FreeRTOS on Cortex-M33 with TrustZone \\
+  SDK \file{board.h}
+    & \api{LED\_RED\_TOGGLE}, \api{LOGIC\_LED\_ON/OFF} macros \\
   \bottomrule
 \end{tabular}
 

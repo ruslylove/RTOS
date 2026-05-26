@@ -22,6 +22,7 @@
 \usepackage{fontawesome5}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{amsmath}
 
 % ── Colors (KMUTNB brand) ──────────────────────────────────────────────────────
 \definecolor{kmutnbBlue}{RGB}{0,56,116}
@@ -76,7 +77,7 @@
   pdfauthor  = {KMUTNB RTOS Course},
 }
 
-% ── Listings (C and bash) ──────────────────────────────────────────────────────
+% ── Listings ──────────────────────────────────────────────────────────────────
 \lstdefinestyle{cstyle}{
   language        = C,
   basicstyle      = \ttfamily\small,
@@ -169,7 +170,6 @@
 \newlist{checklist}{itemize}{1}
 \setlist[checklist]{label=\faSquare[regular], leftmargin=1.5em, noitemsep}
 
-% ── Misc helpers ───────────────────────────────────────────────────────────────
 \newcommand{\file}[1]{\texttt{\small #1}}
 \newcommand{\api}[1]{\texttt{\small #1}}
 
@@ -189,12 +189,12 @@
 \vspace{0.3cm}
 
 \begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
-  \textbf{Platform}     & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 96\,MHz) \\[2pt]
-  \textbf{RTOS}         & FreeRTOS (bare-metal, no SDK) \\[2pt]
-  \textbf{Toolchain}    & ARM GNU Toolchain (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
-  \textbf{Tools}        & pyocd, serial terminal (115200\,8N1) \\[2pt]
+  \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
+  \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
+  \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+  \textbf{Flash / Debug}  & LinkServer (\texttt{/Applications/LinkServer\_26.3.123/}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
-  \textbf{CLO mapping}  & CLO\,3 (FreeRTOS implementation) \enspace CLO\,4 (synchronisation) \\
+  \textbf{CLO mapping}    & CLO\,3 (FreeRTOS implementation) \enspace CLO\,4 (synchronisation) \\
 \end{tabular}
 
 \vspace{0.4cm}
@@ -224,16 +224,18 @@ By completing this lab you will be able to:
 You must have completed \textbf{Lab 01} before starting:
 
 \begin{checklist}
-  \item ARM GNU Toolchain installed and working (\texttt{make} succeeds in
-        \file{lab01\_setup\_verify/})
-  \item \texttt{pyocd} installed (\texttt{pip install pyocd})
+  \item ARM GNU Toolchain 12 installed; \texttt{make} succeeds in
+        \file{lab01\_setup\_verify/}
+  \item NXP MCUXpresso SDK at the path set in \texttt{SDK\_ROOT} in \file{Makefile}
+  \item \textbf{LinkServer} installed:
+        \texttt{/Applications/LinkServer\_26.3.123/LinkServer}
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
-  \item A serial terminal (\texttt{screen}, \texttt{minicom}, PuTTY, or Tera Term)
-        at \textbf{115200\,8N1}
+  \item Python~3 + \texttt{pyserial} for serial monitoring
+        (\texttt{pip3 install pyserial})
 \end{checklist}
 
 \begin{tipbox}
-  No SEGGER SystemView is required for this lab --- all observation is done over UART.
+  All observation in this lab is done over UART --- no SEGGER SystemView required.
 \end{tipbox}
 
 % ── Project Structure ─────────────────────────────────────────────────────────
@@ -241,34 +243,33 @@ You must have completed \textbf{Lab 01} before starting:
 
 \begin{lstlisting}[style=textstyle]
 lab02_freertos_basics/
-  Makefile                  <- build, flash, and debug targets
-  linker_MCXN236.ld         <- flash/RAM memory map
+  Makefile                      <- build, flash, debug targets
   src/
-    startup_MCXN236.s       <- vector table + Reset_Handler
-    main.c                  <- hw_init, RTOS objects, scheduler start
-    lab_tasks.c / .h        <- the three tasks + timer callback
-    FreeRTOSConfig.h        <- kernel configuration
-    uart.h / uart.c         <- bare-metal LPUART4 driver
-  FreeRTOS-Kernel/          <- (cloned by `make setup`)
+    main.c                      <- BOARD_InitHardware, RTOS objects, scheduler start
+    lab_tasks.c / .h            <- the three tasks + timer callback
+    FreeRTOSConfig.h            <- kernel configuration
+  <SDK_ROOT>/                   <- board support, FreeRTOS kernel, drivers (external)
+    rtos/freertos/freertos-kernel-upstream/   <- FreeRTOS kernel
+    devices/MCX/MCXN/MCXN236/               <- device startup + linker script
+    examples/_boards/frdmmcxn236/            <- board.h, clock_config, pin_mux
 \end{lstlisting}
 
 \subsection{What the code does --- the ``Sensor Data Pipeline''}
 
-This lab simulates a small sensor pipeline.  Three tasks and one software timer
-cooperate through shared kernel objects:
+Three tasks and one software timer cooperate through shared kernel objects:
 
 \renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{} l c p{3.4cm} p{5.6cm} @{}}
+\begin{tabular}{@{} l c p{3.4cm} p{5.4cm} @{}}
   \toprule
   \textbf{Task / Object} & \textbf{Priority} & \textbf{Trigger} & \textbf{What it does} \\
   \midrule
-  \texttt{vSensorTask}  & 3 (HIGH) & 500\,ms period (\api{vTaskDelayUntil}) &
+  \texttt{vSensorTask}  & 3 (HIGH) & 500\,ms (\api{vTaskDelayUntil}) &
     Generates a fake ADC reading, sends it to \api{xSensorQueue} \\
   \texttt{vDisplayTask} & 2 (MED)  & Blocks on \api{xSensorQueue} &
-    Receives a reading and prints it (under \api{xUartMutex}) \\
+    Receives a reading, prints via \api{PRINTF} (under \api{xUartMutex}) \\
   \texttt{vStatusTask}  & 1 (LOW)  & Blocks on \api{xStatusSem} &
     Prints uptime + queue depth (under \api{xUartMutex}) \\
-  \texttt{StatusTimer}  & --- (timer task) & 1000\,ms, auto-reload &
+  \texttt{StatusTimer}  & --- & 1000\,ms, auto-reload &
     Callback gives \api{xStatusSem} to wake \texttt{vStatusTask} \\
   \bottomrule
 \end{tabular}
@@ -284,80 +285,88 @@ cooperate through shared kernel objects:
     500 ms                                      |
                                                 | xUartMutex
    StatusTimer ---xStatusSem--> vStatusTask -----+
-    (1000 ms)                    (prio 1)        |
-                                                 v
-                                                UART
+    (1000 ms)                    (prio 1)        v
+                                                UART (PRINTF)
 \end{lstlisting}
 
 \begin{itemize}[noitemsep, leftmargin=*]
-  \item \textbf{Queue} (\api{xSensorQueue}) decouples the producer (\texttt{Sensor})
-        from the consumer (\texttt{Display}).
-  \item \textbf{Semaphore} (\api{xStatusSem}) is a pure \emph{signal} --- the timer
-        signals, the task waits.
-  \item \textbf{Mutex} (\api{xUartMutex}) guarantees only one task drives the UART at
-        a time.
+  \item \textbf{Queue} (\api{xSensorQueue}) decouples the producer from the consumer.
+  \item \textbf{Semaphore} (\api{xStatusSem}) is a pure \emph{signal} from timer to task.
+  \item \textbf{Mutex} (\api{xUartMutex}) guarantees only one task calls \api{PRINTF}
+        at a time.
 \end{itemize}
 
 % ── Part A ─────────────────────────────────────────────────────────────────────
 \section{Part A --- Build and Flash}
 
-\subsection{Step 1 --- Clone the FreeRTOS kernel}
+\subsection{Step 1 --- Build}
 
 \begin{lstlisting}[style=bashstyle]
 cd labs/lab02_freertos_basics
-make setup
-\end{lstlisting}
-
-This runs \texttt{git clone --depth=1} into \file{FreeRTOS-Kernel/}.  You only do this
-once.
-
-\begin{tipbox}
-  Unlike Lab 01, this lab's Makefile also compiles \file{timers.c} --- the
-  software-timer module --- because we use a software timer.
-\end{tipbox}
-
-\subsection{Step 2 --- Build}
-
-\begin{lstlisting}[style=bashstyle]
 make
 \end{lstlisting}
 
 Expected output (sizes will vary slightly):
 
 \begin{lstlisting}[style=textstyle]
-arm-none-eabi-gcc  ...  -o lab02.elf
+arm-none-eabi-gcc ... -o lab02.elf
 arm-none-eabi-objcopy -O binary lab02.elf lab02.bin
    text    data     bss     dec     hex filename
-  1xxxx     xxx   xxxxx   xxxxx    xxxx lab02.elf
+  30576      20   24260   54856    d648 lab02.elf
 \end{lstlisting}
 
 \begin{warnbox}
-  If \texttt{arm-none-eabi-gcc: not found}, set the toolchain path at the top of
-  \file{Makefile}:
-  \begin{lstlisting}[style=bashstyle, aboveskip=0pt, belowskip=0pt]
-  TOOLCHAIN ?= /path/to/arm-none-eabi/bin
-  \end{lstlisting}
+  \textbf{Toolchain not found:} Edit \texttt{TOOLCHAIN} at the top of \file{Makefile}.
+
+  \medskip
+  \textbf{SDK not found:} Edit \texttt{SDK\_ROOT} in \file{Makefile} to match your
+  SDK installation path.
 \end{warnbox}
 
-\subsection{Step 3 --- Flash}
+\subsection{Step 2 --- Flash}
+
+Connect the board via the MCU-LINK USB port, then:
 
 \begin{lstlisting}[style=bashstyle]
 make flash
 \end{lstlisting}
 
-pyocd erases, programs, and resets the MCU.  The board runs immediately.
+This calls LinkServer to erase, program, and reset the MCU.
+Look for \texttt{Finished writing Flash successfully} in the output.
+
+\begin{tipbox}
+  \textbf{Alternative --- pyocd:} Activate the venv at\\
+  \texttt{/Users/rus/Development/nxp\_test/.venv/bin/pyocd}\\
+  then run: \texttt{pyocd flash lab02.elf -t mcxn236}
+\end{tipbox}
 
 % ── Part B ─────────────────────────────────────────────────────────────────────
 \section{Part B --- UART Output Verification}
 
-Open a serial terminal:
+Find the serial port and open a terminal:
 
 \begin{lstlisting}[style=bashstyle]
-ls /dev/tty.usbmodem*        # find the port
-screen /dev/tty.usbmodemXXXX 115200
+ls /dev/cu.usbmodem*          # find the port
+screen /dev/cu.usbmodemXXXXXX 115200
+# Press Ctrl-A then Ctrl-\ to quit
 \end{lstlisting}
 
-Press the board \textbf{RESET} button to see the banner from the start.
+\textbf{Or with Python (clean capture):}
+
+\begin{lstlisting}[style=bashstyle]
+python3 -c "
+import serial, time, sys
+s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s.reset_input_buffer()
+end = time.time() + 10
+while time.time() < end:
+    d = s.read(256)
+    if d: sys.stdout.buffer.write(d); sys.stdout.buffer.flush()
+s.close()
+"
+\end{lstlisting}
+
+\textbf{Windows:} PuTTY or Tera Term --- \texttt{COMx}, 115200\,baud, 8N1.
 
 \subsection{Expected output}
 
@@ -368,26 +377,25 @@ Primitives: Queue | Mutex | Semaphore | Timer
 
 [MAIN] Starting scheduler...
 
-[DISPLAY] t=0 ms  value=7
-[DISPLAY] t=500 ms  value=14
+[DISPLAY] t=500 ms  value=7
+[DISPLAY] t=1000 ms  value=14
 
-[STATUS] uptime=1000 ms  queue_waiting=0
-[DISPLAY] t=1000 ms  value=21
-[DISPLAY] t=1500 ms  value=28
+[STATUS] uptime=1003 ms  queue_waiting=0
+[DISPLAY] t=1500 ms  value=21
+[DISPLAY] t=2000 ms  value=28
 
-[STATUS] uptime=2000 ms  queue_waiting=0
+[STATUS] uptime=2003 ms  queue_waiting=0
 \end{lstlisting}
 
 \begin{tipbox}
   \textbf{Key observations:}
   \begin{itemize}[noitemsep]
-    \item Two \texttt{[DISPLAY]} lines appear for every one \texttt{[STATUS]} line ---
-          500\,ms vs.\ 1000\,ms.
-    \item \texttt{queue\_waiting=0} --- the consumer keeps up with the producer, so the
-          queue stays empty.
+    \item Two \texttt{[DISPLAY]} lines appear for every one \texttt{[STATUS]} ---
+          500\,ms vs.\ 1000\,ms periods.
+    \item \texttt{queue\_waiting=0} --- the consumer keeps up; the queue stays empty.
     \item The \texttt{value} field steps by 7 each reading
           (\texttt{raw = (raw + 7) \% 101}).
-    \item Lines never interleave --- the mutex serialises UART access.
+    \item Lines never interleave --- the mutex serialises \api{PRINTF} calls.
   \end{itemize}
 \end{tipbox}
 
@@ -399,8 +407,8 @@ Primitives: Queue | Mutex | Semaphore | Timer
 % ── Part C ─────────────────────────────────────────────────────────────────────
 \section{Part C --- Experiments}
 
-Work through these in order.  For each experiment: make the edit, run
-\texttt{make flash}, observe the UART, then answer the question.
+For each experiment: make the edit, run \texttt{make flash}, observe the UART, answer
+the question.
 
 \begin{warnbox}
   Restore the original code after each experiment unless told otherwise.
@@ -408,28 +416,23 @@ Work through these in order.  For each experiment: make the edit, run
 
 \subsection{Experiment 1 --- The queue as a producer--consumer buffer}
 
-The producer (\texttt{Sensor}) runs every 500\,ms.  The consumer (\texttt{Display})
-normally keeps up.  Now make the consumer \textbf{slower than} the producer.
-
+Make the consumer slower than the producer.
 In \file{lab\_tasks.c}, inside \texttt{vDisplayTask}, add a delay after the print:
 
 \begin{lstlisting}[style=cstyle]
 xSemaphoreGive(xUartMutex);
-vTaskDelay(pdMS_TO_TICKS(900));   /* <-- ADD: slow consumer */
+vTaskDelay(pdMS_TO_TICKS(900));   /* ADD: slow consumer */
 \end{lstlisting}
 
-Rebuild, flash, and watch the \texttt{queue\_waiting} count in the \texttt{[STATUS]}
-lines.
+Rebuild, flash, and watch the \texttt{queue\_waiting} count in \texttt{[STATUS]} lines.
 
 \begin{questionbox}[~1]
   \begin{enumerate}[label=(\alph*), noitemsep, leftmargin=*]
     \item The producer makes 2 readings/s; the consumer now drains $\sim$1.1/s.
-          Watch \texttt{queue\_waiting} climb.  The queue depth is \textbf{8}
-          (see \api{xQueueCreate} in \file{main.c}) --- roughly how many seconds until
-          you see \texttt{[SENSOR] Queue full --- reading dropped!}?
-    \item \api{xQueueSend} in \texttt{vSensorTask} uses a timeout of \texttt{0}.
-          What would change if it used \api{portMAX\_DELAY} instead?  Would readings
-          still be dropped?
+          The queue depth is \textbf{8} --- roughly how many seconds until you see
+          \texttt{[SENSOR] Queue full --- reading dropped!}?
+    \item \api{xQueueSend} uses a timeout of \texttt{0}.  What would change if it
+          used \api{portMAX\_DELAY}?  Would readings still be dropped?
     \item In one sentence: what problem does a queue solve that a shared global
           variable does not?
   \end{enumerate}
@@ -439,14 +442,14 @@ Restore \texttt{vDisplayTask} (remove the added \api{vTaskDelay}).
 
 \subsection{Experiment 2 --- The mutex and the race condition}
 
-\api{xUartMutex} ensures \texttt{Display} and \texttt{Status} never write the UART at
-the same time.  Remove it and force a collision.
+\api{xUartMutex} prevents \texttt{Display} and \texttt{Status} from calling
+\api{PRINTF} at the same time.  Remove it and force a collision.
 
 \begin{enumerate}[noitemsep, leftmargin=*]
   \item In \file{lab\_tasks.c}, comment out \textbf{all four}
         \api{xSemaphoreTake(xUartMutex, ...)} and \api{xSemaphoreGive(xUartMutex)}
-        calls in \texttt{vDisplayTask} and \texttt{vStatusTask} (keep the
-        \api{uart\_printf} lines).
+        calls in \texttt{vDisplayTask} and \texttt{vStatusTask}
+        (keep the \api{PRINTF} calls).
   \item To make collisions frequent, speed both producers up:
         \begin{itemize}[noitemsep]
           \item \texttt{vSensorTask}: change \texttt{xPeriod} to
@@ -455,18 +458,18 @@ the same time.  Remove it and force a collision.
         \end{itemize}
 \end{enumerate}
 
-Rebuild, flash, and study the terminal.
+Rebuild, flash, and study the terminal output.
 
 \begin{questionbox}[~2]
   \begin{enumerate}[label=(\alph*), noitemsep, leftmargin=*]
-    \item Do you see garbled lines --- a \texttt{[DISPLAY]} fragment spliced into the
-          middle of a \texttt{[STATUS]} line, or vice versa?
+    \item Do you see garbled lines --- a \texttt{[DISPLAY]} fragment spliced into
+          a \texttt{[STATUS]} line, or vice versa?
     \item This is a \textbf{race condition}.  Explain why it happens \emph{even on a
-          single-core MCU}.  (Hint: the UART sends one character at a time; the
-          scheduler can preempt \texttt{Display} mid-string.)
+          single-core MCU}.  (Hint: \api{PRINTF} sends characters one at a time;
+          the scheduler can preempt mid-string.)
     \item FreeRTOS mutexes implement \textbf{priority inheritance}
-          (\texttt{configUSE\_MUTEXES~1}), but binary semaphores do not.  Why does that
-          matter when a low-priority task holds a lock that a high-priority task wants?
+          (\texttt{configUSE\_MUTEXES~1}), but binary semaphores do not.  Why does
+          that matter when a low-priority task holds a lock a high-priority task wants?
   \end{enumerate}
 \end{questionbox}
 
@@ -474,24 +477,22 @@ Restore the mutex calls and the original periods.
 
 \subsection{Experiment 3 --- Binary vs.\ counting semaphore (lost signals)}
 
-\api{xStatusSem} is a \textbf{binary} semaphore: it holds at most one ``token''.  If
-the timer gives it again before \texttt{vStatusTask} takes it, the extra give is
-\textbf{discarded}.
+\api{xStatusSem} is a \textbf{binary} semaphore: it holds at most one token.
+Extra \api{Give} calls before \api{Take} are discarded.
 
 \begin{enumerate}[noitemsep, leftmargin=*]
-  \item In \file{main.c}, speed up the timer: \api{pdMS\_TO\_TICKS(1000)} $\to$
-        \api{pdMS\_TO\_TICKS(200)}.
-  \item In \file{lab\_tasks.c}, slow down \texttt{vStatusTask} by adding a delay after
-        the print:
+  \item In \file{main.c}, speed up the timer:
+        \api{pdMS\_TO\_TICKS(1000)} $\to$ \api{pdMS\_TO\_TICKS(200)}.
+  \item In \file{lab\_tasks.c}, slow down \texttt{vStatusTask} by adding after the print:
 \end{enumerate}
 
 \begin{lstlisting}[style=cstyle]
 xSemaphoreGive(xUartMutex);
-vTaskDelay(pdMS_TO_TICKS(1000));   /* <-- ADD */
+vTaskDelay(pdMS_TO_TICKS(1000));   /* ADD */
 \end{lstlisting}
 
-Rebuild and flash.  The timer now fires $\sim$5\,$\times$/s, but \texttt{vStatusTask}
-can only process $\sim$1\,$\times$/s.
+Rebuild and flash.  The timer fires $\sim$5$\times$/s but the task processes
+$\sim$1$\times$/s.
 
 \begin{questionbox}[~3a]
   How many \texttt{[STATUS]} lines appear per second?  How many timer ``gives'' are
@@ -509,20 +510,20 @@ xStatusSem = xSemaphoreCreateCounting(10, 0);  /* was xSemaphoreCreateBinary() *
 
 \begin{questionbox}[~3b]
   With the counting semaphore, what happens when \texttt{vStatusTask} finally runs
-  after its 1000\,ms delay?  Why does it now print several lines back-to-back?  When is
-  a binary semaphore the \emph{correct} choice, and when do you need a counting one?
+  after its 1000\,ms delay?  When is a binary semaphore the \emph{correct} choice,
+  and when do you need a counting one?
 \end{questionbox}
 
-Restore the binary semaphore, the 1000\,ms timer period, and \texttt{vStatusTask}.
+Restore the binary semaphore, the 1000\,ms timer period, and remove the delay.
 
 \subsection{Experiment 4 --- Software timer: one-shot vs.\ auto-reload}
 
-The \texttt{StatusTimer} is created with \texttt{pdTRUE} --- \textbf{auto-reload}.
-Change it to one-shot.  In \file{main.c}, in the \api{xTimerCreate} call:
+Change \texttt{StatusTimer} from auto-reload to one-shot.
+In \file{main.c}, in the \api{xTimerCreate} call:
 
 \begin{lstlisting}[style=cstyle]
 xTimerCreate("StatusTimer", pdMS_TO_TICKS(1000),
-             pdFALSE,   /* <-- was pdTRUE: now one-shot */
+             pdFALSE,   /* was pdTRUE -- now one-shot */
              NULL, vStatusTimerCallback);
 \end{lstlisting}
 
@@ -530,14 +531,13 @@ Rebuild and flash.
 
 \begin{questionbox}[~4]
   \begin{enumerate}[label=(\alph*), noitemsep, leftmargin=*]
-    \item How many \texttt{[STATUS]} lines do you see now, and why?
-    \item The callback \api{vStatusTimerCallback} runs in the \textbf{timer service
-          task} (\texttt{configTIMER\_TASK\_PRIORITY = 4}, the highest priority).
-          Why must a timer callback \textbf{never} call a blocking API such as
-          \api{vTaskDelay} or a \texttt{Take} with a long timeout?
-    \item Name one way to make a one-shot timer fire repeatedly \emph{without} using
-          \texttt{pdTRUE}.  (Hint: \api{xTimerStart} / \api{xTimerReset} can be called
-          from inside the callback.)
+    \item How many \texttt{[STATUS]} lines appear now, and why?
+    \item The callback runs in the \textbf{timer service task}
+          (\texttt{configTIMER\_TASK\_PRIORITY = 4}).  Why must a timer callback
+          \textbf{never} call a blocking API like \api{vTaskDelay} or a long-timeout
+          \api{Take}?
+    \item Name one way to make a one-shot timer fire repeatedly without using
+          \texttt{pdTRUE}.
   \end{enumerate}
 \end{questionbox}
 
@@ -545,23 +545,23 @@ Restore \texttt{pdTRUE}.
 
 \subsection{Challenge (optional) --- \texttt{vTaskDelay} vs.\ \texttt{vTaskDelayUntil}}
 
-\texttt{vSensorTask} uses \api{vTaskDelayUntil} for a \textbf{drift-free} 500\,ms
-period.  Replace it with \api{vTaskDelay} and add a variable workload:
+\texttt{vSensorTask} uses \api{vTaskDelayUntil} for a drift-free 500\,ms period.
+Replace it with \api{vTaskDelay} and add a variable workload:
 
 \begin{lstlisting}[style=cstyle]
-/* Simulate variable processing time before the delay */
+/* Simulate variable processing time */
 for (volatile int i = 0; i < 200000; i++) { }
 
-vTaskDelay(pdMS_TO_TICKS(500));        /* <-- was vTaskDelayUntil(...) */
+vTaskDelay(pdMS_TO_TICKS(500));        /* was vTaskDelayUntil(...) */
 \end{lstlisting}
 
-Rebuild, flash, and look at the \texttt{t=} timestamps in the \texttt{[DISPLAY]} lines.
+Rebuild, flash, and look at the \texttt{t=} timestamps in \texttt{[DISPLAY]} lines.
 
 \begin{questionbox}[~Challenge]
-  With \api{vTaskDelay}, the period becomes \emph{work time + 500\,ms}, so the
-  timestamps drift away from clean multiples of 500.  With \api{vTaskDelayUntil} they
-  stay locked to the 500\,ms grid.  Explain why --- what does \api{vTaskDelayUntil}
-  measure its delay \emph{from} that \api{vTaskDelay} does not?
+  With \api{vTaskDelay}, the period becomes \emph{work time + 500\,ms} and timestamps
+  drift from clean multiples of 500.  With \api{vTaskDelayUntil} they stay locked to
+  the 500\,ms grid.  Explain why --- what does \api{vTaskDelayUntil} measure its delay
+  \emph{from} that \api{vTaskDelay} does not?
 \end{questionbox}
 
 Restore the original \api{vTaskDelayUntil} code.
@@ -577,8 +577,8 @@ Submit the following to the course LMS by the posted deadline:
   \textbf{\#} & \textbf{Item} & \textbf{Details} \\
   \midrule
   1 & Baseline capture     & 5+ seconds of correct output (Checkpoint~A) \\
-  2 & Experiment 1 capture & Terminal output showing a \texttt{Queue full} drop \\
-  3 & Experiment 2 capture & Terminal output showing garbled (interleaved) lines \\
+  2 & Experiment 1 capture & Output showing \texttt{Queue full} drop \\
+  3 & Experiment 2 capture & Output showing garbled (interleaved) lines \\
   4 & Experiment 3 captures & Before \emph{and} after the counting semaphore \\
   5 & Answers to Q1--Q4    & A few sentences each; reference the code or output \\
   6 & Challenge answer     & Optional, if attempted \\
@@ -590,17 +590,17 @@ Submit the following to the course LMS by the posted deadline:
 \section{Key Concepts Introduced}
 
 \renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{} p{7cm} p{6.5cm} @{}}
+\begin{tabular}{@{} p{7.2cm} p{6.3cm} @{}}
   \toprule
   \textbf{Concept} & \textbf{Where you saw it} \\
   \midrule
-  Producer--consumer decoupling via a queue & Experiment~1 \\
-  Queue overflow and non-blocking \api{xQueueSend} & Experiment~1 \\
-  Race condition on a shared resource & Experiment~2 \\
+  Producer--consumer decoupling via a queue       & Experiment~1 \\
+  Queue overflow and non-blocking \api{xQueueSend}& Experiment~1 \\
+  Race condition on a shared resource             & Experiment~2 \\
   Mutex as a critical-section guard; priority inheritance & Experiment~2 \\
-  Binary vs.\ counting semaphore; lost signals & Experiment~3 \\
+  Binary vs.\ counting semaphore; lost signals    & Experiment~3 \\
   Software timers: one-shot vs.\ auto-reload; callback rules & Experiment~4 \\
-  Drift-free periodic timing & Challenge \\
+  Drift-free periodic timing with \api{vTaskDelayUntil} & Challenge \\
   \bottomrule
 \end{tabular}
 \renewcommand{\arraystretch}{1}
@@ -621,9 +621,9 @@ These primitives are the toolkit for Module~3 (synchronisation) and Module~4
   Laplante, \textit{Real-Time Systems Design} &
     Ch.~3 (intertask communication, synchronisation) \\
   FreeRTOS documentation &
-    \api{xQueueCreate}, \api{xQueueSend}, \api{xQueueReceive},
-    \api{xSemaphoreCreateMutex}, \api{xSemaphoreCreateBinary},
-    \api{xSemaphoreCreateCounting}, \api{xTimerCreate} \\
+    \api{xQueueCreate}, \api{xQueueSend}, \api{xQueueReceive},\\
+    & \api{xSemaphoreCreateMutex}, \api{xSemaphoreCreateBinary},\\
+    & \api{xSemaphoreCreateCounting}, \api{xTimerCreate} \\
   \bottomrule
 \end{tabular}
 
