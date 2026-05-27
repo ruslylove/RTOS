@@ -13,9 +13,12 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "fsl_debug_console.h"
+#include "board.h"
 #include "MCXN236.h"
-#include "uart.h"
 #include "ns_tasks.h"
+
+/* uart.h shim is available for ns_tasks.c and other files that include it */
 
 /* ── SecureFault handler (Part C) ────────────────────────────────────────── */
 /*
@@ -30,13 +33,13 @@
  */
 void SecureFault_Handler(void)
 {
-    uart_printf("[NS] !!! SecureFault !!!\r\n");
+    PRINTF("[NS] !!! SecureFault !!!\r\n");
 
     /* TODO: print SFSR -- Secure Fault Status Register */
-    uart_printf("[NS] SFSR = 0x%08lX\r\n", (unsigned long)SAU->SFSR);
+    PRINTF("[NS] SFSR = 0x%08lX\r\n", (unsigned long)SAU->SFSR);
 
     /* TODO: print SFAR -- Secure Fault Address Register (valid when SFARVALID=1) */
-    uart_printf("[NS] SFAR = 0x%08lX\r\n", (unsigned long)SAU->SFAR);
+    PRINTF("[NS] SFAR = 0x%08lX\r\n", (unsigned long)SAU->SFAR);
 
     /* Spin -- do not attempt to return from a fault */
     for (;;) {}
@@ -45,7 +48,7 @@ void SecureFault_Handler(void)
 /* ── vApplicationMallocFailedHook ────────────────────────────────────────── */
 void vApplicationMallocFailedHook(void)
 {
-    uart_printf("[NS] FATAL: heap allocation failed\r\n");
+    PRINTF("[NS] FATAL: heap allocation failed\r\n");
     for (;;) {}
 }
 
@@ -53,16 +56,16 @@ void vApplicationMallocFailedHook(void)
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
-    uart_printf("[NS] FATAL: stack overflow in task '%s'\r\n", pcTaskName);
+    PRINTF("[NS] FATAL: stack overflow in task '%s'\r\n", pcTaskName);
     for (;;) {}
 }
 
 /* ── main ────────────────────────────────────────────────────────────────── */
 int main(void)
 {
-    /* TODO: call BOARD_InitHardware() for NS-accessible peripherals */
+    BOARD_InitHardware();
 
-    uart_printf("[NS] starting FreeRTOS...\r\n");
+    PRINTF("[NS] starting FreeRTOS...\r\n");
 
     /* ── Task creation ──────────────────────────────────────────────────── */
 

@@ -11,7 +11,8 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "uart.h"
+#include "board.h"
+#include "fsl_debug_console.h"
 #include "dwt.h"
 #include "workload.h"
 #include "latency_test.h"
@@ -25,7 +26,7 @@
 void vApplicationMallocFailedHook(void)
 {
     taskDISABLE_INTERRUPTS();
-    uart_puts("[FATAL] malloc failed\r\n");
+    PRINTF("[FATAL] malloc failed\r\n");
     for (;;) {}
 }
 
@@ -33,20 +34,19 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
     taskDISABLE_INTERRUPTS();
-    uart_printf("[FATAL] stack overflow: %s\r\n", pcTaskName);
+    PRINTF("[FATAL] stack overflow: %s\r\n", pcTaskName);
     for (;;) {}
 }
 
 /* ════════════════════════════════════════════════════════════════════════════ */
 int main(void)
 {
-    /* TODO: hw_init() — configure clock to 150 MHz */
-    uart_init();
+    BOARD_InitHardware();
 
     /* Enable DWT cycle counter before any task runs */
     DWT_Enable();
 
-    uart_puts("\r\n=== RTOS Lab 06: WCET Measurement with DWT ===\r\n\r\n");
+    PRINTF("\r\n=== RTOS Lab 06: WCET Measurement with DWT ===\r\n\r\n");
 
 #ifdef ENABLE_PART_A
     /* Part A: one-shot measurement task */
@@ -70,7 +70,7 @@ int main(void)
     /* xTaskCreate(vBackgroundTask2, "BG2", 256, NULL, 2, NULL); */
 #endif
 
-    uart_printf("[MAIN] starting scheduler — free heap: %u bytes\r\n",
+    PRINTF("[MAIN] starting scheduler — free heap: %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     vTaskStartScheduler();

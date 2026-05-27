@@ -18,7 +18,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "overflow_demo.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ── Recursive helper ────────────────────────────────────────────────────── */
 
@@ -54,13 +54,13 @@ void vOverflowTask(void *pvParameters)
 
     for (;;)
     {
-        uart_printf("[OVF] calling recursive_sum(60)...\r\n");
+        PRINTF("[OVF] calling recursive_sum(60)...\r\n");
 
         /* This will overflow a 64-word (256-byte) stack */
         uint32_t result = recursive_sum(60u);
 
         /* If detection is off, execution may reach here with corrupt stack */
-        uart_printf("[OVF] result = %lu  (should never print with 64-word stack)\r\n",
+        PRINTF("[OVF] result = %lu  (should never print with 64-word stack)\r\n",
                     result);
 
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -81,7 +81,7 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
     /* Disable interrupts — we are in an unrecoverable state */
     taskDISABLE_INTERRUPTS();
 
-    uart_printf("\r\n!!! STACK OVERFLOW in task: %s !!!\r\n", pcTaskName);
+    PRINTF("\r\n!!! STACK OVERFLOW in task: %s !!!\r\n", pcTaskName);
 
     /*
      * TODO (production system): log to non-volatile memory (e.g. Flash or

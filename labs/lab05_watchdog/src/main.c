@@ -14,7 +14,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
-#include "uart.h"
+#include "board.h"
+#include "fsl_debug_console.h"
 #include "deadlock_tasks.h"
 #include "watchdog.h"
 
@@ -34,7 +35,7 @@ SemaphoreHandle_t xMutexB = NULL;
 void vApplicationMallocFailedHook(void)
 {
     taskDISABLE_INTERRUPTS();
-    uart_puts("[FATAL] malloc failed\r\n");
+    PRINTF("[FATAL] malloc failed\r\n");
     for (;;) {}
 }
 
@@ -42,17 +43,16 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
     taskDISABLE_INTERRUPTS();
-    uart_printf("[FATAL] stack overflow: %s\r\n", pcTaskName);
+    PRINTF("[FATAL] stack overflow: %s\r\n", pcTaskName);
     for (;;) {}
 }
 
 /* ════════════════════════════════════════════════════════════════════════════ */
 int main(void)
 {
-    /* TODO: hw_init() — configure PLL to 150 MHz */
-    uart_init();
+    BOARD_InitHardware();
 
-    uart_puts("\r\n=== RTOS Lab 05: Deadlock & Watchdog ===\r\n");
+    PRINTF("\r\n=== RTOS Lab 05: Deadlock & Watchdog ===\r\n");
 
     /* ── Check watchdog reset cause at boot (Part C) ────────────────────── */
 #if LAB_PART >= 3
@@ -63,14 +63,14 @@ int main(void)
          * Refer to the MCXN236 RM: WDOG32_CS[DONE] or use
          * RCM_GetPreviousResetSources() from the SDK.                     */
     }
-    uart_puts("[BOOT] checking reset cause...\r\n");
+    PRINTF("[BOOT] checking reset cause...\r\n");
     /* Placeholder — replace with actual reset cause detection */
-    uart_puts("[BOOT] (no watchdog reset detected on this boot)\r\n");
+    PRINTF("[BOOT] (no watchdog reset detected on this boot)\r\n");
 #endif
 
     /* ── Parts A & B — Deadlock tasks ───────────────────────────────────── */
 #if LAB_PART == 1 || LAB_PART == 2
-    uart_printf("[MAIN] Part %d — creating mutex pair and deadlock tasks\r\n",
+    PRINTF("[MAIN] Part %d — creating mutex pair and deadlock tasks\r\n",
                 LAB_PART);
 
     xMutexA = xSemaphoreCreateMutex();
@@ -83,14 +83,14 @@ int main(void)
 
     /* ── Part C — Hardware watchdog ─────────────────────────────────────── */
 #if LAB_PART == 3
-    uart_puts("[MAIN] Part C — hardware watchdog task\r\n");
+    PRINTF("[MAIN] Part C — hardware watchdog task\r\n");
     /* Priority 4 — highest, so it always runs before the deadline */
     xTaskCreate(vWatchdogTask, "Watchdog", 256, NULL, 4, NULL);
 #endif
 
     /* ── Part D — Software watchdog monitor ─────────────────────────────── */
 #if LAB_PART == 4
-    uart_puts("[MAIN] Part D — software watchdog monitor\r\n");
+    PRINTF("[MAIN] Part D — software watchdog monitor\r\n");
     xTaskCreate(vWatchdogMonitor, "WdgMon", 256, NULL, 4, NULL);
 
     /* Create NUM_WORKERS worker tasks, passing the ID as the parameter */
@@ -100,7 +100,7 @@ int main(void)
     }
 #endif
 
-    uart_printf("[MAIN] starting scheduler — free heap: %u bytes\r\n",
+    PRINTF("[MAIN] starting scheduler — free heap: %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     vTaskStartScheduler();

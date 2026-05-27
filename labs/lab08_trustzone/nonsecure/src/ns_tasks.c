@@ -11,7 +11,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "MCXN236.h"        /* DWT registers */
-#include "uart.h"
+#include "fsl_debug_console.h"
 #include "secure_api.h"     /* NSC declarations -- resolved via cmse_implib.o */
 #include "ns_tasks.h"
 
@@ -59,7 +59,7 @@ void vSensorTask(void *pv)
     for (;;) {
         /* TODO (Part B): read ADC value via NSC veneer and print it */
         int32_t value = Secure_ADC_Read();
-        uart_printf("[NS] ADC value = %ld\r\n", (long)value);
+        PRINTF("[NS] ADC value = %ld\r\n", (long)value);
 
         /* ------------------------------------------------------------------ *
          * Part C: DELIBERATE SECUREFAULT -- uncomment to test                *
@@ -67,7 +67,7 @@ void vSensorTask(void *pv)
          * volatile uint32_t *secure_ptr =                                    *
          *     (volatile uint32_t *)0x20010000U;  <- Secure SRAM              *
          * uint32_t val = *secure_ptr;   <- triggers SecureFault              *
-         * uart_printf("[NS] should never print: %lu\r\n", (unsigned long)val);*
+         * PRINTF("[NS] should never print: %lu\r\n", (unsigned long)val);*
          * ------------------------------------------------------------------ */
 
         vTaskDelay(pdMS_TO_TICKS(200));
@@ -120,7 +120,7 @@ void vBenchmarkTask(void *pv)
     (void)v2;
 
     /* ── Print results ──────────────────────────────────────────────────── */
-    uart_printf("[BENCH] NSC call: %lu cycles  Direct: %lu cycles  Overhead: %lu cycles\r\n",
+    PRINTF("[BENCH] NSC call: %lu cycles  Direct: %lu cycles  Overhead: %lu cycles\r\n",
                 (unsigned long)nsc_cycles,
                 (unsigned long)direct_cycles,
                 (unsigned long)(nsc_cycles - direct_cycles));

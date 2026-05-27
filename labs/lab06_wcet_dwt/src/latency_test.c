@@ -13,7 +13,7 @@
 #include "task.h"
 #include "latency_test.h"
 #include "dwt.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* NXP SDK GPIO driver */
 #include "fsl_gpio.h"
@@ -154,13 +154,13 @@ void vLatencyReportTask(void *pvParameters)
         total += v;
     }
 
-    uart_printf("\r\n=== Interrupt Latency Report ===\r\n");
-    uart_printf("  Samples : %u\r\n",  LATENCY_BUF_SIZE);
-    uart_printf("  Best    : %lu cycles  (%.1f ns)\r\n",
+    PRINTF("\r\n=== Interrupt Latency Report ===\r\n");
+    PRINTF("  Samples : %u\r\n",  LATENCY_BUF_SIZE);
+    PRINTF("  Best    : %lu cycles  (%.1f ns)\r\n",
                 best,  DWT_CYCLES_TO_NS(best));
-    uart_printf("  Worst   : %lu cycles  (%.1f ns)\r\n",
+    PRINTF("  Worst   : %lu cycles  (%.1f ns)\r\n",
                 worst, DWT_CYCLES_TO_NS(worst));
-    uart_printf("  Average : %lu cycles  (%.1f ns)\r\n",
+    PRINTF("  Average : %lu cycles  (%.1f ns)\r\n",
                 total / LATENCY_BUF_SIZE,
                 DWT_CYCLES_TO_NS(total / LATENCY_BUF_SIZE));
 

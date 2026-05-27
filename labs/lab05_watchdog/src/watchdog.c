@@ -14,7 +14,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "watchdog.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* SDK WDOG32 driver — available in MCUXpresso SDK or as a standalone file */
 #include "fsl_wdog32.h"
@@ -52,7 +52,7 @@ void WDOG_Init_1s(void)
     cfg.prescaler    = kWDOG32_ClockPrescalerDivide1;
 
     WDOG32_Init(WDOG0, &cfg);
-    uart_printf("[WDG] WDOG32 initialised — timeout ~1 s\r\n");
+    PRINTF("[WDG] WDOG32 initialised — timeout ~1 s\r\n");
 }
 
 /*
@@ -85,11 +85,11 @@ void vWatchdogTask(void *pvParameters)
 
 #if SIMULATE_HANG
         /* Miss the watchdog deadline — reset expected after ~1 s */
-        uart_printf("[WDG] simulating hang — NOT kicking!\r\n");
+        PRINTF("[WDG] simulating hang — NOT kicking!\r\n");
         vTaskDelay(pdMS_TO_TICKS(2000));
 #else
         WDOG_Kick();
-        uart_printf("[WDG] kicked  t=%lu ms\r\n", (uint32_t)xTaskGetTickCount());
+        PRINTF("[WDG] kicked  t=%lu ms\r\n", (uint32_t)xTaskGetTickCount());
 #endif
     }
 }
@@ -139,7 +139,7 @@ void vWatchdogMonitor(void *pvParameters)
         {
             if (!worker_alive[i])
             {
-                uart_printf("[WDG] worker %d silent -- NOT kicking!\r\n", i);
+                PRINTF("[WDG] worker %d silent -- NOT kicking!\r\n", i);
                 all_ok = false;
             }
             worker_alive[i] = 0;   /* reset for next window */
@@ -148,7 +148,7 @@ void vWatchdogMonitor(void *pvParameters)
         if (all_ok)
         {
             WDOG_Kick();
-            uart_printf("[WDG] all workers OK -- kicked  t=%lu ms\r\n",
+            PRINTF("[WDG] all workers OK -- kicked  t=%lu ms\r\n",
                         (uint32_t)xTaskGetTickCount());
         }
         /* If not all OK, watchdog expires on the next timeout -> system reset */
@@ -179,11 +179,11 @@ void vWorkerTask(void *pvParameters)
         if (id == HANG_WORKER_ID &&
             xTaskGetTickCount() > pdMS_TO_TICKS(HANG_AFTER_MS))
         {
-            uart_printf("[W%d] hanging -- no more check-ins!\r\n", id);
+            PRINTF("[W%d] hanging -- no more check-ins!\r\n", id);
             for (;;) {}   /* infinite loop — watchdog should fire */
         }
 
         wdog_checkin(id);
-        uart_printf("[W%d] working  t=%lu ms\r\n", id, (uint32_t)xTaskGetTickCount());
+        PRINTF("[W%d] working  t=%lu ms\r\n", id, (uint32_t)xTaskGetTickCount());
     }
 }

@@ -17,7 +17,7 @@
 #include "task.h"
 #include "workload.h"
 #include "dwt.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ── Test parameters ─────────────────────────────────────────────────────── */
 #define NUM_RUNS     1000
@@ -104,14 +104,14 @@ void vWcetMeasureTask(void *pvParameters)
     }
 
     /* ── bubble_sort WCET ─────────────────────────────────────────────── */
-    uart_printf("\r\n=== bubble_sort (%d elements) ===\r\n", ARRAY_SIZE);
+    PRINTF("\r\n=== bubble_sort (%d elements) ===\r\n", ARRAY_SIZE);
 
     /* Best case: already sorted */
     memcpy(arr, sorted, sizeof(sorted));
     DWT_START();
     bubble_sort(arr, ARRAY_SIZE);
     DWT_STOP();
-    uart_printf("  best case (sorted input):       %lu cycles  (%.2f us)\r\n",
+    PRINTF("  best case (sorted input):       %lu cycles  (%.2f us)\r\n",
                 _dwt_elapsed, DWT_CYCLES_TO_US(_dwt_elapsed));
 
     /* Worst case: reverse sorted — run NUM_RUNS times */
@@ -127,13 +127,13 @@ void vWcetMeasureTask(void *pvParameters)
         if (cycles > worst) worst = cycles;
         total += cycles;
     }
-    uart_printf("  reverse-sorted (%d runs):  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
+    PRINTF("  reverse-sorted (%d runs):  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
                 NUM_RUNS, best, worst, total / NUM_RUNS);
-    uart_printf("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
+    PRINTF("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
                 (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
 
     /* ── fir_filter WCET ──────────────────────────────────────────────── */
-    uart_printf("\r\n=== fir_filter (16 taps) ===\r\n");
+    PRINTF("\r\n=== fir_filter (16 taps) ===\r\n");
     best = UINT32_MAX; worst = 0; total = 0;
     for (int r = 0; r < NUM_RUNS; r++)
     {
@@ -146,13 +146,13 @@ void vWcetMeasureTask(void *pvParameters)
         if (cycles > worst) worst = cycles;
         total += cycles;
     }
-    uart_printf("  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
+    PRINTF("  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
                 best, worst, total / NUM_RUNS);
-    uart_printf("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
+    PRINTF("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
                 (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
 
     /* ── crc32 WCET ───────────────────────────────────────────────────── */
-    uart_printf("\r\n=== crc32 (%d bytes) ===\r\n", ARRAY_SIZE);
+    PRINTF("\r\n=== crc32 (%d bytes) ===\r\n", ARRAY_SIZE);
     best = UINT32_MAX; worst = 0; total = 0;
     for (int r = 0; r < NUM_RUNS; r++)
     {
@@ -166,12 +166,12 @@ void vWcetMeasureTask(void *pvParameters)
         if (cycles > worst) worst = cycles;
         total += cycles;
     }
-    uart_printf("  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
+    PRINTF("  best=%lu  worst=%lu  avg=%lu  cycles\r\n",
                 best, worst, total / NUM_RUNS);
-    uart_printf("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
+    PRINTF("  WCET + 20%% margin:              %lu cycles  (%.2f us)\r\n",
                 (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
 
-    uart_printf("\r\nMeasurement complete.\r\n");
+    PRINTF("\r\nMeasurement complete.\r\n");
 
     /* Self-delete — measurement is a one-shot task */
     vTaskDelete(NULL);
@@ -202,7 +202,7 @@ void vSortTask(void *pvParameters)
         bubble_sort(arr, ARRAY_SIZE);
         DWT_STOP();
 
-        uart_printf("[SORT] %lu cycles  (%.2f us)\r\n",
+        PRINTF("[SORT] %lu cycles  (%.2f us)\r\n",
                     _dwt_elapsed, DWT_CYCLES_TO_US(_dwt_elapsed));
     }
 }

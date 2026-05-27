@@ -5,8 +5,8 @@
  *
  * Part A — Induce and detect a stack overflow with vOverflowTask.
  *   Step 1: configCHECK_FOR_STACK_OVERFLOW = 0  → observe crash without detection.
- *   Step 3: configCHECK_FOR_STACK_OVERFLOW = 2  → overflow hook fires.
- *   Stack: 64 words (256 bytes) for Step 1-2, 512 words for Part B onwards.
+ *   Step 2: configCHECK_FOR_STACK_OVERFLOW = 2  → overflow hook fires.
+ *   Stack: 64 words (256 bytes) for Step 1, 512 words for Part B onwards.
  *
  * Part B — Right-size all stacks with vStackReportTask.
  *
@@ -27,7 +27,8 @@
 #include "event_groups.h"
 
 #include "FreeRTOSConfig.h"
-#include "uart.h"
+#include "board.h"
+#include "fsl_debug_console.h"
 #include "overflow_demo.h"
 #include "stack_sizing.h"
 
@@ -59,7 +60,7 @@ TaskHandle_t xMonitorHandle  = NULL;
 void vApplicationMallocFailedHook(void)
 {
     taskDISABLE_INTERRUPTS();
-    uart_puts("[FATAL] heap allocation failed\r\n");
+    PRINTF("[FATAL] heap allocation failed\r\n");
     for (;;) {}
 }
 
@@ -68,11 +69,10 @@ void vApplicationMallocFailedHook(void)
 /* ════════════════════════════════════════════════════════════════════════════ */
 int main(void)
 {
-    /* TODO: hw_init() — configure PLL to 150 MHz, then call uart_init() */
-    uart_init();
+    BOARD_InitHardware();
 
-    uart_puts("\r\n=== RTOS Lab 07: Stack Overflow Detection & Memory Analysis ===\r\n");
-    uart_printf("[MAIN] heap free at startup: %u bytes\r\n",
+    PRINTF("\r\n=== RTOS Lab 07: Stack Overflow Detection & Memory Analysis ===\r\n");
+    PRINTF("[MAIN] heap free at startup: %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     /* ── Part A / B — overflow demonstration task ────────────────────────── */
@@ -101,7 +101,7 @@ int main(void)
     xTaskCreate(vMonitorTask, "Monitor",  256, NULL, 2, &xMonitorHandle);
 #endif
 
-    uart_printf("[MAIN] starting scheduler — free heap: %u bytes\r\n",
+    PRINTF("[MAIN] starting scheduler — free heap: %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     vTaskStartScheduler();

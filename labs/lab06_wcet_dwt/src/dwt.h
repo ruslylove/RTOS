@@ -14,7 +14,7 @@
  *   DWT_START();               // saves current cycle count into _dwt_start
  *   do_some_work();
  *   DWT_STOP();                // computes elapsed into _dwt_elapsed
- *   uart_printf("%lu cycles\r\n", _dwt_elapsed);
+ *   PRINTF("%lu cycles\r\n", _dwt_elapsed);
  *
  * At 150 MHz: 1 cycle = 6.67 ns.
  * Counter rolls over after 2^32 cycles ~ 28.6 seconds.

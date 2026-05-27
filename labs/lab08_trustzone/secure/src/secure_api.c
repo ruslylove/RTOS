@@ -16,7 +16,7 @@
 #include <stdint.h>
 #include "arm_cmse.h"
 #include "secure_api.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* ── Private Secure state ────────────────────────────────────────────────── */
 /*
@@ -30,13 +30,13 @@ static volatile int32_t s_last_adc_value = 0;
 /*
  * NSC entry point -- callable from Non-Secure world.
  *
- * TODO (Part B): Verify that the uart_printf below prints with the [S] prefix,
+ * TODO (Part B): Verify that the PRINTF below prints with the [S] prefix,
  *       confirming the call executes in Secure state.
  */
 __attribute__((cmse_nonsecure_entry))
 void Secure_ADC_Init(void)
 {
-    uart_printf("[S] Secure_ADC_Init called from NS world\r\n");
+    PRINTF("[S] Secure_ADC_Init called from NS world\r\n");
 
     /* TODO: initialise real ADC peripheral here if hardware is available */
     s_last_adc_value = 0;

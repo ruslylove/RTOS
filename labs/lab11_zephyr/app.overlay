@@ -1,0 +1,34 @@
+/*
+ * app.overlay -- Device tree overlay for FRDM-MCXN236
+ * Lab 11 — Zephyr RTOS: Sensor + Logger + Monitor Pipeline
+ *
+ * Adds a simulated BME280 sensor on the FRDM-MCXN236's I2C0 bus (LPI2C0).
+ * The BME280 node allows the Zephyr sensor subsystem to exercise the full
+ * driver stack; for Part A the driver returns simulated values.
+ *
+ * Hardware connection (if using a real BME280 breakout):
+ *   SDA -> J2 pin 18 (LPI2C0_SDA / P1_16)
+ *   SCL -> J2 pin 20 (LPI2C0_SCL / P1_17)
+ *   VDD -> 3V3
+ *   GND -> GND
+ *   SDO -> GND  (I2C address 0x76)
+ */
+
+/ {
+    aliases {
+        /* Alias used by sensor_thread.c to find the BME280 node */
+        bme280-sensor = &bme280_0;
+    };
+};
+
+&lpi2c0 {
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_STANDARD>;
+
+    bme280_0: bme280@76 {
+        compatible = "bosch,bme280";
+        reg = <0x76>;
+        label = "BME280_0";
+        status = "okay";
+    };
+};

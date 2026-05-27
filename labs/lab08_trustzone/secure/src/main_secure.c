@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include "arm_cmse.h"
 #include "MCXN236.h"        /* CMSIS device header -- SAU, SCB, etc. */
-#include "uart.h"
+#include "fsl_debug_console.h"
 #include "secure_api.h"
 
 /* ── Forward declarations ────────────────────────────────────────────────── */
@@ -27,22 +27,22 @@ int main(void)
 {
     /* TODO: call BOARD_InitHardware() or equivalent SDK init */
 
-    uart_printf("[S] Secure world started\r\n");
+    PRINTF("[S] Secure world started\r\n");
 
     /* --- Part A: configure the SAU ---------------------------------------- */
     SAU_Configure();
-    uart_printf("[S] SAU configured\r\n");
+    PRINTF("[S] SAU configured\r\n");
 
     /* --- Part A: probe three addresses ------------------------------------- */
-    uart_printf("[S] 0x00010000 is %s\r\n",
+    PRINTF("[S] 0x00010000 is %s\r\n",
                 TZM_IsSecure(0x00010000U) ? "SECURE" : "NS/NSC");
-    uart_printf("[S] 0x00050000 is %s\r\n",
+    PRINTF("[S] 0x00050000 is %s\r\n",
                 TZM_IsSecure(0x00050000U) ? "SECURE" : "NS/NSC");
-    uart_printf("[S] 0x0003FE00 is %s (NSC)\r\n",
+    PRINTF("[S] 0x0003FE00 is %s (NSC)\r\n",
                 TZM_IsSecure(0x0003FE00U) ? "SECURE" : "NS/NSC");
 
     /* --- Part B: release the Non-Secure core ------------------------------ */
-    uart_printf("[S] Releasing Non-Secure image at 0x00040000\r\n");
+    PRINTF("[S] Releasing Non-Secure image at 0x00040000\r\n");
     Boot_NS();
 
     /* Should not return -- Non-Secure world takes over execution */

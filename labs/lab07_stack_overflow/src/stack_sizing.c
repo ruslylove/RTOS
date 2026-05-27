@@ -18,7 +18,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "stack_sizing.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* Allocated stack depths (words) — must match xTaskCreate() calls in main.c */
 #define OVERFLOW_STACK_WORDS  512
@@ -74,10 +74,10 @@ void vStackReportTask(void *pvParameters)
     };
     const int n_tasks = (int)(sizeof(tasks) / sizeof(tasks[0]));
 
-    uart_puts("\r\n=== Stack High-Water Mark Report (after 30 s) ===\r\n");
-    uart_printf("  %-16s  %8s  %8s  %8s  %12s\r\n",
+    PRINTF("\r\n=== Stack High-Water Mark Report (after 30 s) ===\r\n");
+    PRINTF("  %-16s  %8s  %8s  %8s  %12s\r\n",
                 "Task", "Alloc'd", "HWM rem.", "Min used", "Rgt-sized+20%");
-    uart_puts("  ---------------------------------------------------------------\r\n");
+    PRINTF("  ---------------------------------------------------------------\r\n");
 
     for (int i = 0; i < n_tasks; i++)
     {
@@ -88,7 +88,7 @@ void vStackReportTask(void *pvParameters)
         uint32_t    used = tasks[i].allocated_words - (uint32_t)hwm;
         uint32_t    recs = used + (used * HEADROOM_PERCENT / 100u);
 
-        uart_printf("  %-16s  %8lu  %8lu  %8lu  %12lu\r\n",
+        PRINTF("  %-16s  %8lu  %8lu  %8lu  %12lu\r\n",
                     tasks[i].name,
                     tasks[i].allocated_words,
                     (uint32_t)hwm,
@@ -96,10 +96,10 @@ void vStackReportTask(void *pvParameters)
                     recs);
     }
 
-    uart_puts("  ---------------------------------------------------------------\r\n");
-    uart_printf("  Free heap now:         %u bytes\r\n",
+    PRINTF("  ---------------------------------------------------------------\r\n");
+    PRINTF("  Free heap now:         %u bytes\r\n",
                 (unsigned)xPortGetFreeHeapSize());
-    uart_printf("  Minimum ever free:     %u bytes\r\n",
+    PRINTF("  Minimum ever free:     %u bytes\r\n",
                 (unsigned)xPortGetMinimumEverFreeHeapSize());
 
     /* This task's job is done */

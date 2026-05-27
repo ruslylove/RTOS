@@ -17,7 +17,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "deadlock_tasks.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /* Set to 0 for Part A (deadlock), 1 for Part B (resource ordering fix) */
 #define RESOURCE_ORDER_FIX  0
@@ -35,15 +35,15 @@ void vTaskAlpha(void *pvParameters)
     {
         vTaskDelay(pdMS_TO_TICKS(10));
 
-        uart_printf("[A] taking MutexA...\r\n");
+        PRINTF("[A] taking MutexA...\r\n");
         xSemaphoreTake(xMutexA, portMAX_DELAY);
-        uart_printf("[A] took MutexA. Taking MutexB...\r\n");
+        PRINTF("[A] took MutexA. Taking MutexB...\r\n");
 
         /* Brief delay — creates a window for Beta to acquire MutexB */
         vTaskDelay(pdMS_TO_TICKS(5));
 
         xSemaphoreTake(xMutexB, portMAX_DELAY);
-        uart_printf("[A] took both -- doing work  t=%lu ms\r\n",
+        PRINTF("[A] took both -- doing work  t=%lu ms\r\n",
                     (uint32_t)xTaskGetTickCount());
 
         /* Release in reverse acquisition order */
@@ -68,24 +68,24 @@ void vTaskBeta(void *pvParameters)
 
 #if RESOURCE_ORDER_FIX
         /* Part B — FIXED: acquire in ascending lock order (A before B) */
-        uart_printf("[B] taking MutexA (order fix)...\r\n");
+        PRINTF("[B] taking MutexA (order fix)...\r\n");
         xSemaphoreTake(xMutexA, portMAX_DELAY);
-        uart_printf("[B] taking MutexB...\r\n");
+        PRINTF("[B] taking MutexB...\r\n");
         vTaskDelay(pdMS_TO_TICKS(5));
         xSemaphoreTake(xMutexB, portMAX_DELAY);
-        uart_printf("[B] took both -- doing work  t=%lu ms\r\n",
+        PRINTF("[B] took both -- doing work  t=%lu ms\r\n",
                     (uint32_t)xTaskGetTickCount());
         xSemaphoreGive(xMutexB);
         xSemaphoreGive(xMutexA);
 #else
         /* Part A — BROKEN: opposite order creates circular wait */
-        uart_printf("[B] taking MutexB...\r\n");
+        PRINTF("[B] taking MutexB...\r\n");
         xSemaphoreTake(xMutexB, portMAX_DELAY);
-        uart_printf("[B] took MutexB. Taking MutexA...\r\n");
+        PRINTF("[B] took MutexB. Taking MutexA...\r\n");
         vTaskDelay(pdMS_TO_TICKS(5));
         /* TODO: observe that this line stalls permanently after deadlock */
         xSemaphoreTake(xMutexA, portMAX_DELAY);   /* <- opposite order to Alpha */
-        uart_printf("[B] took both -- doing work\r\n");
+        PRINTF("[B] took both -- doing work\r\n");
         xSemaphoreGive(xMutexA);
         xSemaphoreGive(xMutexB);
 #endif

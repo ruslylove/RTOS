@@ -17,7 +17,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "static_alloc.h"
-#include "uart.h"
+#include "fsl_debug_console.h"
 
 /*
  * Import vLoggerTask from producer_consumer.c.
@@ -43,7 +43,7 @@ TaskHandle_t Static_CreateLoggerTask(void)
 {
     TaskHandle_t handle;
 
-    uart_printf("[STATIC] heap before static Logger: %u bytes free\r\n",
+    PRINTF("[STATIC] heap before static Logger: %u bytes free\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     handle = xTaskCreateStatic(
@@ -56,7 +56,7 @@ TaskHandle_t Static_CreateLoggerTask(void)
         &xLoggerTaskBuffer     /* TCB buffer             */
     );
 
-    uart_printf("[STATIC] heap after  static Logger: %u bytes free\r\n",
+    PRINTF("[STATIC] heap after  static Logger: %u bytes free\r\n",
                 (unsigned)xPortGetFreeHeapSize());
 
     return handle;

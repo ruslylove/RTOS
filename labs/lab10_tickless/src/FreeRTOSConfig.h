@@ -11,7 +11,19 @@
 
 #define configUSE_PREEMPTION            1
 #define configUSE_TIME_SLICING          1
+
+/*
+ * configUSE_TICKLESS_IDLE
+ *
+ * Part A: set to 0 — standard SysTick ticking (baseline power measurement).
+ * Part B: set to 1 — FreeRTOS suppresses ticks during idle, calling
+ *         vPortSuppressTicksAndSleep() which programs LPTMR for wakeup.
+ *
+ * TODO (Part B): change to 1 and implement vPortSuppressTicksAndSleep in
+ *                tickless_port.c.
+ */
 #define configUSE_TICKLESS_IDLE         0
+
 #define configMAX_PRIORITIES            5
 #define configMINIMAL_STACK_SIZE        128
 #define configMAX_TASK_NAME_LEN         20
@@ -20,8 +32,7 @@
 
 #define configTOTAL_HEAP_SIZE           (64 * 1024)
 #define configSUPPORT_DYNAMIC_ALLOCATION 1
-/* Set to 1 when completing Part D (static allocation) */
-#define configSUPPORT_STATIC_ALLOCATION  1
+#define configSUPPORT_STATIC_ALLOCATION  0
 #define configFRTOS_MEMORY_SCHEME        4
 
 #define configUSE_TIMERS                1
@@ -39,14 +50,7 @@
 
 #define configUSE_IDLE_HOOK             0
 #define configUSE_TICK_HOOK             0
-/*
- * Stack overflow detection:
- *   0 = disabled (Part A Step 1 — observe crash without detection)
- *   2 = Method 2: check 0xA5 pattern in last 20 bytes at each context switch
- *
- * TODO (Part A Step 2): change this to 2 to enable overflow detection.
- */
-#define configCHECK_FOR_STACK_OVERFLOW  0
+#define configCHECK_FOR_STACK_OVERFLOW  2
 #define configUSE_MALLOC_FAILED_HOOK    1
 
 #define configGENERATE_RUN_TIME_STATS   0
