@@ -43,13 +43,13 @@ void latency_test_init(void)
      *   PORT_SetPinMux(PORT1, PIN_PROBE,  kPORT_MuxAsGpio);
      */
 
-    /* Configure P1_1 as input, rising-edge interrupt */
-    gpio_pin_config_t in_cfg = {kGPIO_DigitalInput, 0, kGPIO_IntRisingEdge};
+    /* Configure P1_1 as input with rising-edge interrupt */
+    gpio_pin_config_t in_cfg = {kGPIO_DigitalInput, 0};
     GPIO_PinInit(TEST_PORT, PIN_INPUT, &in_cfg);
-    GPIO_EnableInterrupts(TEST_PORT, 1u << PIN_INPUT);
+    GPIO_SetPinInterruptConfig(TEST_PORT, PIN_INPUT, kGPIO_InterruptRisingEdge);
 
     /* Configure P1_0 and P1_2 as outputs, initially low */
-    gpio_pin_config_t out_cfg = {kGPIO_DigitalOutput, 0, kGPIO_NoIntmode};
+    gpio_pin_config_t out_cfg = {kGPIO_DigitalOutput, 0};
     GPIO_PinInit(TEST_PORT, PIN_OUTPUT, &out_cfg);
     GPIO_PinInit(TEST_PORT, PIN_PROBE,  &out_cfg);
 
@@ -71,10 +71,10 @@ void GPIO1_IRQHandler(void)
     /* Capture cycle count at ISR entry — must be the very first statement */
     uint32_t t_isr = DWT_GetCycles();
 
-    GPIO_ClearPinsInterruptFlags(TEST_PORT, 1u << PIN_INPUT);
+    GPIO_PinClearInterruptFlag(TEST_PORT, PIN_INPUT);
 
     /* Toggle the probe pin so latency is visible on the oscilloscope */
-    GPIO_TogglePinsOutput(TEST_PORT, 1u << PIN_PROBE);
+    GPIO_PortToggle(TEST_PORT, 1u << PIN_PROBE);
 
     /* Record latency into the ring buffer */
     uint32_t idx = latency_idx % LATENCY_BUF_SIZE;
@@ -98,11 +98,11 @@ void vGpioToggleTask(void *pvParameters)
 
         /* Record DWT just before asserting the pin — ISR measures from here */
         last_gpio_toggle = DWT_GetCycles();
-        GPIO_SetPinsOutput(TEST_PORT, 1u << PIN_OUTPUT);
+        GPIO_PortSet(TEST_PORT, 1u << PIN_OUTPUT);
 
         /* Brief high pulse — clear the pin after one tick */
         vTaskDelay(1);
-        GPIO_ClearPinsOutput(TEST_PORT, 1u << PIN_OUTPUT);
+        GPIO_PortClear(TEST_PORT, 1u << PIN_OUTPUT);
     }
 }
 

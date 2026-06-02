@@ -42,8 +42,8 @@ INCLUDES = \
     -I $(SDK_ROOT)/drivers/lpflexcomm \
     -I $(SDK_ROOT)/drivers/lpflexcomm/lpuart \
     -I $(SDK_ROOT)/drivers/mcx_spc \
-    -I $(SDK_ROOT)/drivers/mu \
     -I $(SDK_ROOT)/drivers/port \
+    -I ../cm33_1/src \
     -I $(SDK_ROOT)/components/assert \
     -I $(SDK_ROOT)/components/debug_console_lite \
     -I $(SDK_ROOT)/components/str \
@@ -64,6 +64,7 @@ LDFLAGS = -T $(SDK_DEVICE)/gcc/MCXN236_flash.ld \
 APP_SRCS = \
     src/main_cm33_0.c \
     src/adc_producer.c \
+    ../cm33_1/src/fir_consumer.c \
     $(SDK_DEVICE)/gcc/startup_MCXN236.S \
     $(SDK_DEVICE)/system_MCXN236.c \
     $(SDK_DEVICE)/drivers/fsl_clock.c \
@@ -74,7 +75,6 @@ APP_SRCS = \
     $(SDK_ROOT)/drivers/lpflexcomm/fsl_lpflexcomm.c \
     $(SDK_ROOT)/drivers/mcx_spc/fsl_spc.c \
     $(SDK_ROOT)/drivers/lpflexcomm/lpuart/fsl_lpuart.c \
-    $(SDK_ROOT)/drivers/mu/fsl_mu.c \
     $(SDK_ROOT)/components/assert/fsl_assert.c \
     $(SDK_ROOT)/components/debug_console_lite/fsl_debug_console.c \
     $(SDK_ROOT)/components/str/fsl_str.c \

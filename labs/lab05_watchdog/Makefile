@@ -42,7 +42,7 @@ INCLUDES = \
     -I $(SDK_ROOT)/drivers/lpflexcomm/lpuart \
     -I $(SDK_ROOT)/drivers/mcx_spc \
     -I $(SDK_ROOT)/drivers/port \
-    -I $(SDK_ROOT)/drivers/wdog32 \
+    -I $(SDK_ROOT)/drivers/wwdt \
     -I $(SDK_ROOT)/components/assert \
     -I $(SDK_ROOT)/components/debug_console_lite \
     -I $(SDK_ROOT)/components/str \
@@ -74,7 +74,7 @@ APP_SRCS = \
     $(SDK_ROOT)/drivers/lpflexcomm/fsl_lpflexcomm.c \
     $(SDK_ROOT)/drivers/mcx_spc/fsl_spc.c \
     $(SDK_ROOT)/drivers/lpflexcomm/lpuart/fsl_lpuart.c \
-    $(SDK_ROOT)/drivers/wdog32/fsl_wdog32.c \
+    $(SDK_ROOT)/drivers/wwdt/fsl_wwdt.c \
     $(SDK_ROOT)/components/assert/fsl_assert.c \
     $(SDK_ROOT)/components/debug_console_lite/fsl_debug_console.c \
     $(SDK_ROOT)/components/str/fsl_str.c \

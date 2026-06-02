@@ -36,10 +36,10 @@ void SecureFault_Handler(void)
     PRINTF("[NS] !!! SecureFault !!!\r\n");
 
     /* TODO: print SFSR -- Secure Fault Status Register */
-    PRINTF("[NS] SFSR = 0x%08lX\r\n", (unsigned long)SAU->SFSR);
+    PRINTF("[NS] SFSR = 0x%08lX\r\n", (unsigned long)SCB->SFSR);
 
     /* TODO: print SFAR -- Secure Fault Address Register (valid when SFARVALID=1) */
-    PRINTF("[NS] SFAR = 0x%08lX\r\n", (unsigned long)SAU->SFAR);
+    PRINTF("[NS] SFAR = 0x%08lX\r\n", (unsigned long)SCB->SFAR);
 
     /* Spin -- do not attempt to return from a fault */
     for (;;) {}

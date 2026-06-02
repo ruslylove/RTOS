@@ -18,13 +18,12 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
 #include "fsl_debug_console.h"
-#include "fsl_mu.h"
 #include "adc_producer.h"
 #include "shared_mem.h"
 
-/* MU channel used for ADC sample notifications (channel 0) */
-#define MU_CHANNEL  0U
+extern QueueHandle_t g_notify_queue;
 
 /* Simulated ADC: simple linear congruential generator for demo purposes */
 static int16_t simulate_adc_sample(void)
@@ -79,8 +78,9 @@ void vADCProducerTask(void *pvParameters)
         /* ── Part B: record send timestamp for latency measurement ──────── */
         /* TODO (Part B): g_latency.send_cycles = DWT->CYCCNT; __DMB(); */
 
-        /* Notify CM33_1 via Messaging Unit (non-blocking) */
-        MU_TrySendMsg(MUA, MU_CHANNEL, (uint32_t)g_ring.write_idx);
+        /* Notify consumer task via FreeRTOS queue (non-blocking) */
+        uint32_t widx = g_ring.write_idx;
+        xQueueSend(g_notify_queue, &widx, 0);
 
         sample_count++;
 

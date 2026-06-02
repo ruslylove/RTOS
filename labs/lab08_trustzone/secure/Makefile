@@ -49,7 +49,7 @@ CFLAGS = $(CPU_FLAGS) $(OPT_FLAGS) $(WARN_FLAGS) \
          -ffunction-sections -fdata-sections \
          $(INCLUDES) $(DEFINES)
 
-LDFLAGS = -T $(SDK_DEVICE)/gcc/MCXN236_flash.ld \
+LDFLAGS = -T $(SDK_DEVICE)/gcc/MCXN236_flash_s.ld \
           -nostartfiles \
           -Wl,--gc-sections \
           -Wl,-Map=$(TARGET).map \

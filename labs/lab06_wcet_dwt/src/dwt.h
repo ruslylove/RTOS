@@ -22,7 +22,7 @@
  */
 
 #include <stdint.h>
-#include "core_cm33.h"   /* CoreDebug, DWT from CMSIS */
+#include "fsl_device_registers.h"   /* device header defines __FPU_PRESENT, __DSP_PRESENT before CMSIS */
 
 /* ── Enable the DWT cycle counter ─────────────────────────────────────────── */
 static inline void DWT_Enable(void)

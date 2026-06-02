@@ -19,8 +19,7 @@
 #include "deadlock_tasks.h"
 #include "watchdog.h"
 
-/* NXP SDK for reset-cause detection */
-#include "fsl_wdog32.h"
+#include "fsl_wwdt.h"
 
 /* Select the lab part to run (1–4) */
 #ifndef LAB_PART
@@ -56,16 +55,16 @@ int main(void)
 
     /* ── Check watchdog reset cause at boot (Part C) ────────────────────── */
 #if LAB_PART >= 3
-    /* After a watchdog reset this flag is set — print a diagnostic message */
-    if (WDOG32_GetStatusFlags(WDOG0) & kWDOG32_RunningFlag)
-    {
-        /* TODO: check the correct flag for "reset was caused by watchdog"
-         * Refer to the MCXN236 RM: WDOG32_CS[DONE] or use
-         * RCM_GetPreviousResetSources() from the SDK.                     */
-    }
     PRINTF("[BOOT] checking reset cause...\r\n");
-    /* Placeholder — replace with actual reset cause detection */
-    PRINTF("[BOOT] (no watchdog reset detected on this boot)\r\n");
+    if (WWDT_GetStatusFlags(WWDT0) & kWWDT_TimeoutFlag)
+    {
+        PRINTF("[BOOT] *** last reset was caused by WWDT timeout ***\r\n");
+        WWDT_ClearStatusFlags(WWDT0, kWWDT_TimeoutFlag);
+    }
+    else
+    {
+        PRINTF("[BOOT] (no watchdog reset on this boot)\r\n");
+    }
 #endif
 
     /* ── Parts A & B — Deadlock tasks ───────────────────────────────────── */
