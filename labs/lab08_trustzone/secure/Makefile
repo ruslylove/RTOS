@@ -89,7 +89,7 @@ OBJS = $(SRCS:.c=.o)
 OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:.s=.o)
 
-LINKSERVER ?= /Applications/LinkServer_26.3.123/LinkServer
+PYOCD ?= /Users/rus/Development/RTOS/.venv/bin/pyocd
 
 .PHONY: all clean flash debug setup
 
@@ -116,17 +116,16 @@ clean:
 	find . -name "*.o" -delete
 	rm -f $(OBJS)
 
-flash: $(TARGET).bin
-	$(LINKSERVER) flash MCXN236:FRDM-MCXN236 load $(TARGET).elf
+flash: $(TARGET).elf
+	$(PYOCD) flash -t mcxn236vdf $<
 	@echo "Secure flash complete. Now build and flash the Non-Secure image."
 
 setup:
 	@echo "Secure-world image for Lab 08 TrustZone (no FreeRTOS)"
 	@echo "After building, copy $(CMSE_LIB) to ../nonsecure/ for NS linking."
 
-debug: $(TARGET).bin
-	@echo "Starting LinkServer GDB server..."
-	@$(LINKSERVER) gdbserver MCXN236:FRDM-MCXN236 &
+debug: $(TARGET).elf
+	@$(PYOCD) gdbserver -t mcxn236vdf -S --port 3333 &
 	@sleep 2
 	$(GDB) $(TARGET).elf \
 	    -ex "target remote localhost:3333" \

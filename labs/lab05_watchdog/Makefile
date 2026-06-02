@@ -102,7 +102,7 @@ OBJS = $(SRCS:.c=.o)
 OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:.s=.o)
 
-LINKSERVER ?= /Applications/LinkServer_26.3.123/LinkServer
+PYOCD ?= /Users/rus/Development/RTOS/.venv/bin/pyocd
 
 .PHONY: all clean flash debug setup
 
@@ -129,17 +129,16 @@ clean:
 	find . -name "*.o" -delete
 	rm -f $(OBJS)
 
-flash: $(TARGET).bin
-	$(LINKSERVER) flash MCXN236:FRDM-MCXN236 load $(TARGET).elf
+flash: $(TARGET).elf
+	$(PYOCD) flash -t mcxn236vdf $<
 	@echo "Flash complete."
 
 setup:
 	@echo "FreeRTOS kernel is from the NXP SDK at $(FREERTOS_DIR)"
 	@echo "No additional setup required."
 
-debug: $(TARGET).bin
-	@echo "Starting LinkServer GDB server..."
-	@$(LINKSERVER) gdbserver MCXN236:FRDM-MCXN236 &
+debug: $(TARGET).elf
+	@$(PYOCD) gdbserver -t mcxn236vdf -S --port 3333 &
 	@sleep 2
 	$(GDB) $(TARGET).elf \
 	    -ex "target remote localhost:3333" \

@@ -131,23 +131,19 @@ clean:
 	find . -name "*.o" -delete
 	rm -f $(OBJS)
 
-LINKSERVER ?= /Applications/LinkServer_26.3.123/LinkServer
+PYOCD ?= /Users/rus/Development/RTOS/.venv/bin/pyocd
 
-flash: $(TARGET).bin
-	$(LINKSERVER) flash MCXN236:FRDM-MCXN236 load $(TARGET).elf
+flash: $(TARGET).elf
+	$(PYOCD) flash -t mcxn236vdf $<
 	@echo "Flash complete."
-
-# Alternative if pyocd venv is active:
-#   pyocd flash $(TARGET).elf -t mcxn236
-# pyocd lives at: /Users/rus/Development/nxp_test/.venv/bin/pyocd
 
 setup:
 	@echo "FreeRTOS kernel is from the NXP SDK at $(FREERTOS_DIR)"
 	@echo "No additional setup required."
 
-debug: $(TARGET).bin
+debug: $(TARGET).elf
 	@echo "Starting pyocd GDB server..."
-	@pyocd gdbserver -t mcxn236 -S --port 3333 &
+	@$(PYOCD) gdbserver -t mcxn236vdf -S --port 3333 &
 	@sleep 2
 	@echo "Connecting GDB."
 	$(GDB) $(TARGET).elf \
