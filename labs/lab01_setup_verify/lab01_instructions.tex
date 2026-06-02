@@ -193,7 +193,7 @@
   \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
   \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
   \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
-  \textbf{Flash / Debug}  & LinkServer (\texttt{/Applications/LinkServer\_26.3.123/}) \\[2pt]
+  \textbf{Flash / Debug}  & pyocd 0.44 via local \texttt{.venv} (target \texttt{mcxn236vdf}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
   \textbf{CLO mapping}    & CLO\,1 (foundations) \enspace CLO\,3 (FreeRTOS implementation) \\
 \end{tabular}
@@ -207,7 +207,7 @@ By completing this lab you will be able to:
 
 \begin{enumerate}[noitemsep, leftmargin=*]
   \item Build a FreeRTOS project using the NXP MCUXpresso SDK and ARM cross-compiler.
-  \item Flash firmware and monitor the board using LinkServer.
+  \item Flash firmware and monitor the board using pyocd.
   \item Verify that FreeRTOS creates and schedules tasks correctly via UART output
         and a physical LED.
   \item Observe how task priority affects scheduling --- the foundation for Module~2.
@@ -224,16 +224,11 @@ Before starting, confirm these are in place:
         \texttt{/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin}\\
         (or update \texttt{TOOLCHAIN} in \file{Makefile})
   \item NXP MCUXpresso SDK extracted; update \texttt{SDK\_ROOT} in \file{Makefile} if needed
-  \item \textbf{LinkServer} installed: \texttt{/Applications/LinkServer\_26.3.123/LinkServer}
+  \item \textbf{pyocd} available: \texttt{/Users/rus/Development/RTOS/.venv/bin/pyocd}
+        (local venv; \texttt{NXP.MCXN236\_DFP} pack pre-installed)
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
   \item Python~3 + \texttt{pyserial} for serial monitoring (\texttt{pip3 install pyserial})
 \end{checklist}
-
-\begin{warnbox}
-  This lab uses \textbf{LinkServer} (NXP's native flash/debug tool) ---
-  not pyocd or J-Link. The board does \textbf{not} need its MCU-Link firmware
-  reflashed. LinkServer works with the factory-default MCU-Link firmware.
-\end{warnbox}
 
 % ── Project Structure ─────────────────────────────────────────────────────────
 \section{Project Structure}
@@ -318,15 +313,8 @@ Connect the board via the MCU-LINK USB port, then:
 make flash
 \end{lstlisting}
 
-This calls LinkServer to erase, program, and reset the MCU.
-Look for \texttt{Finished writing Flash successfully} in the output.
-The board starts running immediately after the reset.
-
-\begin{tipbox}
-  \textbf{Alternative --- pyocd:} pyocd is available in a virtualenv at\\
-  \texttt{/Users/rus/Development/nxp\_test/.venv/bin/pyocd}\\
-  Activate it first, then run: \texttt{pyocd flash lab01.elf -t mcxn236}
-\end{tipbox}
+This uses pyocd to erase, program, and reset the MCU.
+The progress bar completes and the board starts running immediately after the reset.
 
 % ── Part B ─────────────────────────────────────────────────────────────────────
 \section{Part B --- Verify: UART Output and LED}

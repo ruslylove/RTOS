@@ -11,7 +11,7 @@
 By completing this lab you will be able to:
 
 1. Build a FreeRTOS project using the NXP MCUXpresso SDK and ARM cross-compiler.
-2. Flash firmware and monitor the board using LinkServer.
+2. Flash firmware and monitor the board using pyocd.
 3. Verify that FreeRTOS creates and schedules tasks correctly via UART output and a physical LED.
 4. Observe how task priority affects scheduling — the foundation for Module 2.
 5. Identify and prevent a race condition on a shared resource using a mutex.
@@ -26,12 +26,9 @@ Before starting, confirm these are in place:
   `/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin` (or update `TOOLCHAIN` in `Makefile`)
 - [ ] NXP MCUXpresso SDK extracted at  
   `/Users/<you>/Development/NXP_project/SDK/mcuxsdk/mcuxsdk` (update `SDK_ROOT` in `Makefile` if different)
-- [ ] **LinkServer** installed: `/Applications/LinkServer_26.3.123/LinkServer` (or later version)
+- [ ] **pyocd** available: `/Users/rus/Development/RTOS/.venv/bin/pyocd` (local venv, `NXP.MCXN236_DFP` pack installed)
 - [ ] FRDM-MCXN236 board connected via the **MCU-LINK USB** port
 - [ ] Python 3 + `pyserial` for serial monitoring (`pip3 install pyserial`)
-
-> **Note:** This lab uses **LinkServer** (NXP's native flash/debug tool) — not pyocd or J-Link.  
-> The board does **not** need its MCU-Link firmware reflashed.
 
 ---
 
@@ -99,14 +96,10 @@ Connect the board via the MCU-LINK USB port, then:
 make flash
 ```
 
-This calls LinkServer to erase, program, and reset the MCU:
+This uses pyocd to erase, program, and reset the MCU. Look for the progress bar completing:
 ```
-Finished writing Flash successfully.
+Programmed ... bytes ... at ... kB/s
 ```
-
-> **Alternative — pyocd:** pyocd is available in a virtualenv at  
-> `/Users/rus/Development/nxp_test/.venv/bin/pyocd`.  
-> Activate it first, then run `pyocd flash lab01.elf -t mcxn236`.
 
 The board resets and starts executing immediately after flashing.
 

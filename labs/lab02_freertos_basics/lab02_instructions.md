@@ -25,7 +25,7 @@ You must have completed **Lab 01** before starting:
 
 - [ ] ARM GNU Toolchain 12 installed; `make` succeeds in `lab01_setup_verify/`
 - [ ] NXP MCUXpresso SDK at the path set in `SDK_ROOT` in `Makefile`
-- [ ] **LinkServer** installed: `/Applications/LinkServer_26.3.123/LinkServer`
+- [ ] **pyocd** available: `/Users/rus/Development/RTOS/.venv/bin/pyocd` (local venv, `NXP.MCXN236_DFP` pack installed)
 - [ ] FRDM-MCXN236 connected via the **MCU-LINK USB** port
 - [ ] Python 3 + `pyserial` for serial monitoring (`pip3 install pyserial`)
 
@@ -105,12 +105,8 @@ arm-none-eabi-objcopy -O binary lab02.elf lab02.bin
 make flash
 ```
 
-This calls LinkServer to erase, program, and reset the MCU.
-Look for `Finished writing Flash successfully` in the output.
-
-> **Alternative — pyocd:** activate the venv at
-> `/Users/rus/Development/nxp_test/.venv/bin/pyocd`, then run
-> `pyocd flash lab02.elf -t mcxn236`.
+This uses pyocd to erase, program, and reset the MCU.
+Look for the progress bar completing — the board starts executing immediately after.
 
 ---
 

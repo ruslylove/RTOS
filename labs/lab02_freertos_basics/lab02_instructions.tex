@@ -192,7 +192,7 @@
   \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
   \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
   \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
-  \textbf{Flash / Debug}  & LinkServer (\texttt{/Applications/LinkServer\_26.3.123/}) \\[2pt]
+  \textbf{Flash / Debug}  & pyocd 0.44 via local \texttt{.venv} (target \texttt{mcxn236vdf}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
   \textbf{CLO mapping}    & CLO\,3 (FreeRTOS implementation) \enspace CLO\,4 (synchronisation) \\
 \end{tabular}
@@ -227,8 +227,8 @@ You must have completed \textbf{Lab 01} before starting:
   \item ARM GNU Toolchain 12 installed; \texttt{make} succeeds in
         \file{lab01\_setup\_verify/}
   \item NXP MCUXpresso SDK at the path set in \texttt{SDK\_ROOT} in \file{Makefile}
-  \item \textbf{LinkServer} installed:
-        \texttt{/Applications/LinkServer\_26.3.123/LinkServer}
+  \item \textbf{pyocd} available: \texttt{/Users/rus/Development/RTOS/.venv/bin/pyocd}
+        (local venv; \texttt{NXP.MCXN236\_DFP} pack pre-installed)
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
   \item Python~3 + \texttt{pyserial} for serial monitoring
         (\texttt{pip3 install pyserial})
@@ -331,14 +331,8 @@ Connect the board via the MCU-LINK USB port, then:
 make flash
 \end{lstlisting}
 
-This calls LinkServer to erase, program, and reset the MCU.
-Look for \texttt{Finished writing Flash successfully} in the output.
-
-\begin{tipbox}
-  \textbf{Alternative --- pyocd:} Activate the venv at\\
-  \texttt{/Users/rus/Development/nxp\_test/.venv/bin/pyocd}\\
-  then run: \texttt{pyocd flash lab02.elf -t mcxn236}
-\end{tipbox}
+This uses pyocd to erase, program, and reset the MCU.
+The progress bar completes and the board starts running immediately after the reset.
 
 % ── Part B ─────────────────────────────────────────────────────────────────────
 \section{Part B --- UART Output Verification}
