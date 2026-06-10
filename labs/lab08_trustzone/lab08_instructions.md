@@ -23,8 +23,8 @@ By completing this lab you will be able to:
 
 - [ ] Lab 07 complete.
 - [ ] ARM GNU Toolchain with CMSE support (`arm-none-eabi-gcc` ≥ 10, compiled with `-mcmse`).
-- [ ] MCUXpresso IDE or command-line build with separate Secure and Non-Secure projects.
-- [ ] SEGGER J-Link or MCU-Link (J-Link firmware) for debugging SecureFault.
+- [ ] Two separate Makefile projects: `secure/` and `nonsecure/`.
+- [ ] pyocd for flashing.
 
 ---
 
@@ -39,16 +39,16 @@ The Cortex-M33 has two security states: **Secure (S)** and **Non-Secure (NS)**. 
 
 ### Two-project build structure
 
-TrustZone-M requires two separate firmware images:
+TrustZone-M requires two separate firmware images linked to different flash regions:
 
 ```
-Secure project (linked to 0x0000_0000)
+Secure project  → MCXN236_flash_s.ld  (0x0000_0000 .. 0x0003_FFFF)
   - Runs first after reset
   - Configures SAU, TrustZone peripherals
-  - Implements secure API functions
+  - Implements Secure API functions
   - Releases Non-Secure image
 
-Non-Secure project (linked to 0x0004_0000)
+Non-Secure project → MCXN236_flash_ns.ld  (0x0004_0000 .. flash end)
   - FreeRTOS scheduler
   - Application tasks
   - Calls Secure API through NSC veneers
@@ -60,26 +60,24 @@ Non-Secure project (linked to 0x0004_0000)
 
 ```
 lab08_trustzone/
-├── secure/                        ← Secure-world project
-│   ├── Makefile
-│   ├── linker_secure.ld           ← Secure flash + SRAM regions
-│   ├── src/
-│   │   ├── main_secure.c          ← SAU config, Secure init, NS release
-│   │   ├── secure_api.c/.h        ← NSC entry functions
-│   │   ├── secure_api_veneer.h    ← auto-generated veneer declarations
-│   │   └── startup_MCXN236_s.s    ← Secure vector table
-│   └── cmse_implib.o              ← output: NSC import library
-├── nonsecure/                     ← Non-Secure FreeRTOS project
-│   ├── Makefile
-│   ├── linker_nonsecure.ld        ← NS flash + SRAM regions
-│   ├── src/
-│   │   ├── main_ns.c              ← FreeRTOS init, task creation
-│   │   ├── ns_tasks.c/.h          ← tasks that call Secure API
-│   │   ├── FreeRTOSConfig.h
-│   │   └── uart.h / uart.c
-│   └── FreeRTOS-Kernel/
-└── flash_both.sh                  ← flashes S image then NS image
+├── secure/
+│   ├── Makefile                        ← links with MCXN236_flash_s.ld, -mcmse
+│   └── src/
+│       ├── main_secure.c               ← SAU config, Secure init, NS release
+│       ├── secure_api.c/.h             ← NSC entry functions
+│       └── FreeRTOSConfig.h (optional)
+│   └── cmse_implib.o                   ← output: NSC import library
+└── nonsecure/
+    ├── Makefile                        ← links with MCXN236_flash_ns.ld
+    │                                      includes -I ../secure/src
+    │                                      links ../secure/cmse_implib.o
+    └── src/
+        ├── main_ns.c                   ← FreeRTOS init, SecureFault handler
+        ├── ns_tasks.c/.h               ← tasks that call Secure API
+        └── FreeRTOSConfig.h
 ```
+
+All console output uses `PRINTF()` from `fsl_debug_console.h`.
 
 ---
 
@@ -120,13 +118,9 @@ void SAU_Configure(void)
 
 ### Step 2 — Verify with `TZM_IsSecure`
 
-Add a diagnostic function that probes whether an address is Secure:
-
 ```c
-/* Secure-side only — NS code cannot call this */
 bool TZM_IsSecure(uint32_t addr)
 {
-    /* Read SAU to check if addr falls in a Secure (non-NSC, non-NS) region */
     for (int i = 0; i < 8; i++) {
         SAU->RNR = i;
         if (!(SAU->RLAR & SAU_RLAR_ENABLE_Msk)) continue;
@@ -134,19 +128,14 @@ bool TZM_IsSecure(uint32_t addr)
         uint32_t limit = (SAU->RLAR & SAU_RLAR_LADDR_Msk) | 0x1F;
         if (addr >= base && addr <= limit) return false; /* NS or NSC */
     }
-    return true; /* not in any NS/NSC region → Secure */
+    return true;
 }
 ```
 
-Call from `main_secure.c` before releasing the NS core:
-
 ```c
-uart_printf("[S] 0x00010000 is %s\r\n",
-    TZM_IsSecure(0x00010000) ? "SECURE" : "NS/NSC");
-uart_printf("[S] 0x00050000 is %s\r\n",
-    TZM_IsSecure(0x00050000) ? "SECURE" : "NS/NSC");
-uart_printf("[S] 0x0003FE00 is %s (NSC)\r\n",
-    TZM_IsSecure(0x0003FE00) ? "SECURE" : "NS/NSC");
+PRINTF("[S] 0x00010000 is %s\r\n",  TZM_IsSecure(0x00010000) ? "SECURE" : "NS/NSC");
+PRINTF("[S] 0x00050000 is %s\r\n",  TZM_IsSecure(0x00050000) ? "SECURE" : "NS/NSC");
+PRINTF("[S] 0x0003FE00 is %s (NSC)\r\n", TZM_IsSecure(0x0003FE00) ? "SECURE" : "NS/NSC");
 ```
 
 **Checkpoint A:** UART showing correct Secure/NS attribution for three test addresses.
@@ -162,24 +151,22 @@ In `secure/src/secure_api.c`:
 ```c
 #include <arm_cmse.h>
 #include "secure_api.h"
+#include "fsl_debug_console.h"
 
-/* Secure ADC value — NS world must not read this directly */
 static volatile int32_t s_last_adc_value = 0;
-
-/* NSC entry function — callable from Non-Secure world */
-__attribute__((cmse_nonsecure_entry))
-int32_t Secure_ADC_Read(void)
-{
-    /* Simulate ADC read in Secure world */
-    s_last_adc_value = (s_last_adc_value + 37) % 4096;
-    return s_last_adc_value;
-}
 
 __attribute__((cmse_nonsecure_entry))
 void Secure_ADC_Init(void)
 {
-    uart_printf("[S] Secure_ADC_Init called from NS world\r\n");
+    PRINTF("[S] Secure_ADC_Init called from NS world\r\n");
     s_last_adc_value = 0;
+}
+
+__attribute__((cmse_nonsecure_entry))
+int32_t Secure_ADC_Read(void)
+{
+    s_last_adc_value = (s_last_adc_value + 37) % 4096;
+    return s_last_adc_value;
 }
 ```
 
@@ -190,30 +177,32 @@ In `secure/src/secure_api.h`:
 #define SECURE_API_H
 #include <stdint.h>
 
-/* Declarations for NS world — placed in CMSE import library */
-int32_t Secure_ADC_Read(void);
 void    Secure_ADC_Init(void);
+int32_t Secure_ADC_Read(void);
 
 #endif
 ```
 
-### Step 2 — Build the Secure image and generate the import library
+### Step 2 — Build the Secure image
 
 ```bash
-cd secure
-make
-# Output: secure.elf  +  cmse_implib.o (NSC veneer import library)
+cd secure && make
+# Output: lab08_s.elf  +  cmse_implib.o
 ```
 
-The linker flag `-Wl,--cmse-implib -Wl,--out-implib=cmse_implib.o` generates the import library containing SG stubs.
+The Makefile uses `MCXN236_flash_s.ld` and links with:
+
+```
+-Wl,--cmse-implib -Wl,--out-implib=cmse_implib.o
+```
 
 Verify SG stubs appear in the map file:
 
 ```bash
-grep "\.gnu\.sgstubs" secure.map
+grep "\.gnu\.sgstubs" lab08_s.map
 ```
 
-Expected:
+Expected output:
 ```
 .gnu.sgstubs   0x0003fe00   0x10   Secure_ADC_Read
 .gnu.sgstubs   0x0003fe10   0x08   Secure_ADC_Init
@@ -223,35 +212,35 @@ Expected:
 
 ### Step 3 — Call from Non-Secure FreeRTOS task
 
-Copy `cmse_implib.o` to `nonsecure/`. In `nonsecure/src/ns_tasks.c`:
+The NS Makefile includes `-I ../secure/src` (for `secure_api.h`) and links `../secure/cmse_implib.o` automatically. In `nonsecure/src/ns_tasks.c`:
 
 ```c
-/* Include Secure API header — functions have NS-safe declarations */
-#include "secure_api.h"
+#include "secure_api.h"    /* resolved via ../secure/cmse_implib.o */
 
 void vSensorTask(void *pv)
 {
     Secure_ADC_Init();
     for (;;) {
         int32_t value = Secure_ADC_Read();
-        uart_printf("[NS] ADC value = %ld\r\n", value);
+        PRINTF("[NS] ADC value = %ld\r\n", (long)value);
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 ```
 
-Build the NS image (links against `cmse_implib.o`):
+Build the NS image:
 
 ```bash
-cd nonsecure
-make
+cd nonsecure && make
 ```
 
 ### Step 4 — Flash and run
 
+Flash the Secure image first, then the Non-Secure image:
+
 ```bash
-./flash_both.sh
-# Flashes secure.bin to 0x0000_0000, then nonsecure.bin to 0x0004_0000
+cd secure   && make flash
+cd nonsecure && make flash
 ```
 
 Expected output:
@@ -259,7 +248,6 @@ Expected output:
 [S] SAU configured
 [S] 0x00010000 is SECURE
 [S] 0x00050000 is NS/NSC
-[S] Releasing Non-Secure image at 0x00040000
 [NS] starting FreeRTOS...
 [S] Secure_ADC_Init called from NS world
 [NS] ADC value = 37
@@ -275,34 +263,36 @@ Expected output:
 
 ### Step 1 — Direct NS→Secure SRAM access
 
-In `vSensorTask`, add a deliberate access to Secure SRAM (this will fault):
+In `vSensorTask`, add a deliberate access to Secure SRAM (comment out after observing the fault):
 
 ```c
-/* Attempting to read Secure SRAM from NS world — should SecureFault */
 volatile uint32_t *secure_ptr = (volatile uint32_t *)0x20010000U; /* Secure SRAM */
 uint32_t val = *secure_ptr;   /* ← triggers SecureFault */
-uart_printf("[NS] should never print: %lu\r\n", val);
+PRINTF("[NS] should never print: %lu\r\n", (unsigned long)val);
 ```
 
-### Step 2 — Implement SecureFault handler
+### Step 2 — SecureFault handler in NS project
 
-In `nonsecure/src/startup_MCXN236_ns.s` (or `main_ns.c`):
+The fault handler reads `SCB->SFSR` and `SCB->SFAR`. These registers are banked — the non-secure view of these registers is accessible from NS state for fault diagnosis:
 
 ```c
+/* main_ns.c */
 void SecureFault_Handler(void)
 {
-    uart_printf("[NS] !!! SecureFault !!!\r\n");
-    uart_printf("[NS] SFSR = 0x%08lX\r\n", SAU->SFSR);
-    uart_printf("[NS] SFAR = 0x%08lX\r\n", SAU->SFAR);
+    PRINTF("[NS] !!! SecureFault !!!\r\n");
+    PRINTF("[NS] SFSR = 0x%08lX\r\n", (unsigned long)SCB->SFSR);
+    PRINTF("[NS] SFAR = 0x%08lX\r\n", (unsigned long)SCB->SFAR);
     for (;;) {}
 }
 ```
+
+> **Note:** Use `SCB->SFSR` and `SCB->SFAR` — **not** `SAU->SFSR` / `SAU->SFAR`. The `SAU` peripheral registers (SAU_CTRL, SAU_RNR, SAU_RBAR, SAU_RLAR) are Secure-world only. The Secure Fault Status and Address Registers are in the `SCB` address space and are accessible from NS state for fault diagnosis.
 
 **Checkpoint C:** UART showing `!!! SecureFault !!!` with SFSR/SFAR values. Note the faulting address (0x20010000) in SFAR.
 
 > **Question C1:** The SecureFault is raised on the **NS** side (not the Secure side). Explain why — which hardware unit detects the violation and in which security state does the fault handler run?
 
-> **Question C2:** The SFSR (Secure Fault Status Register) has several bits. Look up the meaning of bit 1 (`SFARVALID`) and bit 0 (`INVEP`). Which bit is set in your fault? What does it indicate?
+> **Question C2:** The SFSR has several bits. Look up the meaning of bit 1 (`SFARVALID`) and bit 0 (`INVEP`). Which bit is set in your fault? What does it indicate?
 
 ---
 
@@ -310,28 +300,36 @@ void SecureFault_Handler(void)
 
 ### Step 1 — Benchmark NSC vs direct call
 
-Use the DWT cycle counter (Lab 06) to compare:
+Use the DWT cycle counter from Lab 06:
 
 ```c
 void vBenchmarkTask(void *pv)
 {
     DWT_Enable();
-    uint32_t nsc_cycles, direct_cycles;
 
-    /* NSC call overhead */
+    /* Warm up I-cache */
+    for (int w = 0; w < 3; w++) {
+        volatile int32_t t = Secure_ADC_Read();
+        t = ns_dummy_adc_read();
+        (void)t;
+    }
+
     DWT_START();
     volatile int32_t v1 = Secure_ADC_Read();   /* crosses S/NS boundary */
     DWT_STOP();
-    nsc_cycles = _dwt_elapsed;
+    uint32_t nsc_cycles = _dwt_elapsed;
+    (void)v1;
 
-    /* Direct function call (replace with a dummy NS function of equal complexity) */
     DWT_START();
     volatile int32_t v2 = ns_dummy_adc_read(); /* NS-only, same logic */
     DWT_STOP();
-    direct_cycles = _dwt_elapsed;
+    uint32_t direct_cycles = _dwt_elapsed;
+    (void)v2;
 
-    uart_printf("[BENCH] NSC call: %lu cycles  Direct: %lu cycles  Overhead: %lu cycles\r\n",
-                nsc_cycles, direct_cycles, nsc_cycles - direct_cycles);
+    PRINTF("[BENCH] NSC: %lu cycles  Direct: %lu cycles  Overhead: %lu cycles\r\n",
+                (unsigned long)nsc_cycles,
+                (unsigned long)direct_cycles,
+                (unsigned long)(nsc_cycles - direct_cycles));
     vTaskDelete(NULL);
 }
 ```
@@ -367,7 +365,7 @@ void vBenchmarkTask(void *pv)
 | CMSE `cmse_nonsecure_entry` + SG veneer | Part B |
 | NSC import library and BLXNS call | Part B |
 | SecureFault on illegal NS→S access | Part C |
-| SFSR / SFAR fault diagnosis | Part C |
+| SFSR / SFAR fault diagnosis (via SCB) | Part C |
 | NSC call overhead measurement | Part D |
 
 ---
@@ -380,3 +378,4 @@ void vBenchmarkTask(void *pv)
 | NXP AN13814 | TrustZone-M on MCXN236 |
 | ARM CMSE specification | `cmse_nonsecure_entry`, `BLXNS` |
 | GCC ARM options | `-mcmse`, `--cmse-implib`, `--out-implib` |
+| NXP MCUXpresso SDK | `MCXN236_flash_s.ld`, `MCXN236_flash_ns.ld` |

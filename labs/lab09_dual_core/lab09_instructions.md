@@ -1,9 +1,9 @@
-# Lab 09 — Dual-Core AMP: Messaging Unit & Shared SRAM
+# Lab 09 — Producer-Consumer IPC with FreeRTOS Queue
 
 **Course:** M.Eng. Real-Time Operating Systems · KMUTNB  
-**Platform:** NXP FRDM-MCXN236 (Cortex-M33 × 2)  
-**Estimated time:** 4–5 hours  
-**Builds on:** Lab 06 (DWT), Lab 07 (memory analysis)
+**Platform:** NXP FRDM-MCXN236 (Cortex-M33)  
+**Estimated time:** 3–4 hours  
+**Builds on:** Lab 06 (DWT), Lab 05 (watchdog / task coordination)
 
 ---
 
@@ -11,49 +11,58 @@
 
 By completing this lab you will be able to:
 
-1. **Boot** both CM33 cores of the MCXN236 from a single project using SYSCON boot address registers.
-2. **Exchange** 32-bit messages between cores using the Messaging Unit (MU) mailboxes.
-3. **Implement** a shared SRAM ring buffer with correct DMB memory barriers.
-4. **Measure** inter-core IPC latency (MU send → ISR entry) using DWT timestamps on both cores.
-5. **Compare** MU-direct vs ring-buffer throughput for high-rate data transfer.
+1. **Implement** a lock-free single-producer / single-consumer ring buffer with correct memory barriers.
+2. **Notify** a consumer task from a producer task using a FreeRTOS queue.
+3. **Apply** the producer-consumer pattern to a simulated 100 Hz ADC data stream.
+4. **Apply** a 4-tap moving-average FIR filter in the consumer task.
+5. **Measure** IPC notification latency (queue send to consumer wake-up) using DWT timestamps.
+6. **Analyse** throughput, dropped-sample rate, and CPU load.
+
+> **Hardware note:** The MCXN236 is a single-core device. This lab demonstrates the same producer-consumer and ring-buffer concepts that appear in dual-core AMP systems, using two FreeRTOS tasks and a FreeRTOS queue as the notification mechanism instead of a hardware Messaging Unit (MU).
 
 ---
 
 ## Prerequisites
 
+- [ ] Lab 05 complete (FreeRTOS task coordination).
 - [ ] Lab 06 complete (DWT cycle counter working).
 - [ ] ARM GNU Toolchain and `pyocd` working.
-- [ ] MCUXpresso SDK for MCXN236 (for `fsl_mu.h` and multicore startup code).
-- [ ] Understanding of memory barriers (`__DMB()`, `__DSB()`).
 
 ---
 
 ## Background
 
-### MCXN236 AMP configuration
+### Lock-free ring buffer
 
-The MCXN236 has two independent Cortex-M33 cores (CM33_0 and CM33_1). In AMP mode:
+The ring buffer in `shared_mem.h` is safe for a **single producer / single consumer** without a mutex, provided:
 
-- Each core runs its own independent firmware image with its own FreeRTOS instance.
-- CM33_0 boots first (primary core). It writes the CM33_1 boot address and releases the reset.
-- Communication uses the **Messaging Unit (MU)** — four 32-bit TX/RX registers per direction, hardware flow control.
-- Shared data lives in **SRAM4** (0x2008_0000, 128 KB) — accessible by both cores.
-
-### Memory barriers
-
-The Cortex-M33 has a weakly ordered memory model. Without barriers, the CPU may reorder stores/loads before the MU send, causing the consumer to read stale data:
+1. The producer writes data **before** updating `write_idx`.
+2. The consumer reads `write_idx` **before** reading data.
+3. Both accesses use `volatile` to prevent compiler reordering.
+4. `__DMB()` barriers are placed around the index updates to prevent CPU store/load reordering.
 
 ```c
-/* Producer — on CM33_0 */
-shared_buf[idx] = data;   /* store */
-__DMB();                   /* all preceding stores visible before MU send */
-MU_SendMsg(MUA, 0, idx);   /* notify consumer */
+/* Producer */
+buf[write_idx] = sample;
+__DMB();                         /* store visible before index update */
+write_idx = next;
+__DMB();                         /* index update visible before queue send */
+xQueueSend(g_notify_queue, &write_idx, 0);
 
-/* Consumer ISR — on CM33_1 */
-uint32_t idx = MU_ReceiveMsg(MUB, 0);
-__DMB();                   /* MU read complete before we read shared_buf */
-process(shared_buf[idx]);
+/* Consumer (after receiving from queue) */
+__DMB();                         /* ensure write_idx read before data read */
+while (read_idx != write_idx) {
+    process(buf[read_idx]);
+    read_idx = (read_idx + 1) % SIZE;
+}
 ```
+
+### FreeRTOS queue as IPC notification
+
+Instead of a hardware Messaging Unit, we use a small FreeRTOS queue (depth 8) to pass the current `write_idx` from the producer to the consumer. This decouples the two tasks while keeping the data path through the ring buffer:
+
+- Producer: `xQueueSend(g_notify_queue, &write_idx, 0)` — non-blocking, drops if full.
+- Consumer: `xQueueReceive(g_notify_queue, &dummy, pdMS_TO_TICKS(100))` — blocks until notified or timeout.
 
 ---
 
@@ -61,272 +70,230 @@ process(shared_buf[idx]);
 
 ```
 lab09_dual_core/
-├── cm33_0/                          ← Primary core firmware
+├── cm33_0/                         ← single binary: both tasks run here
 │   ├── Makefile
-│   ├── linker_cm33_0.ld             ← SRAM0+1 private, SRAM4 shared
 │   └── src/
-│       ├── main_cm33_0.c            ← boots CM33_1, creates ADC task
-│       ├── adc_producer.c/.h        ← ADC sampling task
-│       ├── shared_mem.h             ← shared ring buffer declaration
+│       ├── main_cm33_0.c           ← hardware init, queue create, task create
+│       ├── adc_producer.c/.h       ← simulated ADC producer task
 │       ├── FreeRTOSConfig.h
-│       └── uart.h / uart.c          ← LPUART on CM33_0
-├── cm33_1/                          ← Secondary core firmware
-│   ├── Makefile
-│   ├── linker_cm33_1.ld             ← SRAM2+3 private, SRAM4 shared
+│       └── (includes ../cm33_1/src/ for fir_consumer)
+├── cm33_1/
 │   └── src/
-│       ├── main_cm33_1.c            ← MU init, FreeRTOS start
-│       ├── fir_consumer.c/.h        ← FIR filter task
-│       ├── shared_mem.h             ← same shared ring buffer header
-│       ├── FreeRTOSConfig.h
-│       └── uart.h / uart.c          ← LPUART on CM33_1
-└── flash_dual.sh                    ← flashes both images
+│       ├── fir_consumer.c/.h       ← FIR consumer task (compiled into cm33_0 binary)
+│       └── FreeRTOSConfig.h
+└── shared/
+    └── shared_mem.h                ← ring buffer + latency structs
 ```
+
+Both `adc_producer.c` and `fir_consumer.c` are compiled into a single ELF and run as independent FreeRTOS tasks. The `g_notify_queue` global queue handle is declared in `main_cm33_0.c` and referenced as `extern` from both task files.
 
 ---
 
-## Part A — Boot Both Cores
+## Part A — Ring Buffer and Task Setup
 
-### Step 1 — Release CM33_1 from CM33_0
-
-In `cm33_0/src/main_cm33_0.c`, after hardware init and before starting the scheduler:
+### Step 1 — Shared data structures (`shared_mem.h`)
 
 ```c
-#include "fsl_syscon.h"
-
-void Boot_CM33_1(void)
-{
-    /* Write CM33_1's vector table address (= start of its flash region) */
-    SYSCON->CPBOOT   = 0x00080000U;   /* CM33_1 flash start */
-    SYSCON->CPUCTRL |= SYSCON_CPUCTRL_CPU1RSTEN_MASK;   /* assert reset */
-    SYSCON->CPUCTRL &= ~SYSCON_CPUCTRL_CPU1RSTEN_MASK;  /* release reset */
-    uart_printf("[CM0] CM33_1 released at 0x00080000\r\n");
-}
-```
-
-### Step 2 — CM33_1 startup
-
-CM33_1's `main_cm33_1.c` initialises its own hardware and announces its presence:
-
-```c
-int main(void)
-{
-    BOARD_InitHardware_CM33_1();
-    uart_printf("[CM1] Core 1 running at %lu Hz\r\n",
-                CLOCK_GetFreq(kCLOCK_CoreSysClk));
-    /* ... FreeRTOS init ... */
-    vTaskStartScheduler();
-}
-```
-
-**Checkpoint A:** UART showing both `[CM0]` and `[CM1]` startup messages.
-
-> **Question A1:** CM33_0 releases CM33_1 by writing `CPBOOT` and toggling `CPU1RSTEN`. What would happen if CM33_0 wrote `CPBOOT` but never cleared `CPU1RSTEN`?
-
----
-
-## Part B — MU Direct Messaging
-
-### Step 1 — Send 32-bit messages
-
-On CM33_0 (sender task):
-
-```c
-void vMuSendTask(void *pv)
-{
-    uint32_t count = 0;
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-        MU_SendMsg(MUA, 0, count);
-        uart_printf("[CM0] sent %lu\r\n", count);
-        count++;
-    }
-}
-```
-
-On CM33_1 (MU receive ISR):
-
-```c
-void MUA_IRQHandler(void)
-{
-    uint32_t msg = MU_ReceiveMsg(MUB, 0);
-    MU_ClearStatusFlags(MUB, kMU_Rx0FullFlag);
-    uart_printf("[CM1] received %lu\r\n", msg);
-}
-
-/* In main_cm33_1.c: enable MU RX interrupt */
-MU_EnableInterrupts(MUB, kMU_Rx0FullInterruptEnable);
-EnableIRQ(MUA_IRQn);
-```
-
-**Checkpoint B:** UART showing matching send/receive sequence.
-
-### Step 2 — Measure MU latency with DWT
-
-On CM33_0, record the DWT cycle count just before `MU_SendMsg`. On CM33_1, record it in the first instruction of the ISR. Use a shared SRAM4 variable to communicate timestamps:
-
-```c
-/* shared_mem.h */
-typedef struct {
-    volatile uint32_t send_cycles;    /* written by CM33_0 */
-    volatile uint32_t recv_cycles;    /* written by CM33_1 ISR */
-} __attribute__((packed)) LatencyTest_t;
-
-extern LatencyTest_t g_latency;   /* in .sram4 section */
-```
-
-```c
-/* CM33_0 sender */
-g_latency.send_cycles = DWT->CYCCNT;
-__DMB();
-MU_SendMsg(MUA, 0, 0xDEAD);
-
-/* CM33_1 ISR — first two lines */
-g_latency.recv_cycles = DWT->CYCCNT;
-__DMB();
-```
-
-After a few exchanges, CM33_1 prints the latency:
-
-```c
-uint32_t latency = g_latency.recv_cycles - g_latency.send_cycles;
-uart_printf("[CM1] MU latency = %lu cycles (%.1f ns @ 150 MHz)\r\n",
-            latency, latency / 150.0f);
-```
-
-**Checkpoint B2:** Terminal showing measured MU latency in cycles and nanoseconds.
-
-> **Question B1:** The MU TX register has hardware flow control — `MU_SendMsg` blocks until the remote core reads the register. For a high-frequency producer (1 kHz), is this acceptable? How would you fix it without blocking the sender?
-
----
-
-## Part C — Shared SRAM Ring Buffer
-
-### Step 1 — Place ring buffer in SRAM4
-
-In `shared_mem.h`:
-
-```c
-#define RING_BUF_SIZE  256
+#define RING_BUF_SIZE  256U   /* must be a power of two */
 
 typedef struct {
-    volatile uint32_t write_idx;
-    volatile uint32_t read_idx;
-    volatile uint32_t missed;      /* overflow counter */
+    volatile uint32_t write_idx;            /* updated by producer */
+    volatile uint32_t read_idx;             /* updated by consumer */
+    volatile uint32_t missed;               /* dropped samples (buffer full) */
     int16_t           data[RING_BUF_SIZE];
 } __attribute__((packed, aligned(4))) RingBuf_t;
 
-/* Defined in a .sram4 section via linker script */
-extern RingBuf_t g_ring;
+typedef struct {
+    volatile uint32_t send_cycles;   /* DWT timestamp just before queue send */
+    volatile uint32_t recv_cycles;   /* DWT timestamp at consumer wake-up */
+} __attribute__((packed)) LatencyTest_t;
+
+extern RingBuf_t     g_ring;
+extern LatencyTest_t g_latency;
 ```
 
-In the linker script (`cm33_0/linker_cm33_0.ld`):
-
-```ld
-MEMORY {
-  flash0  (rx)  : ORIGIN = 0x00000000, LENGTH = 512K
-  sram01  (rwx) : ORIGIN = 0x20000000, LENGTH = 256K   /* CM33_0 private */
-  sram4   (rw)  : ORIGIN = 0x20080000, LENGTH = 128K   /* shared */
-}
-
-SECTIONS {
-  /* ... normal sections ... */
-  .sram4 (NOLOAD) : {
-    KEEP(*(.sram4*))
-  } > sram4
-}
-```
-
-### Step 2 — Producer on CM33_0 (1 kHz ADC task)
+### Step 2 — Create the queue and tasks (`main_cm33_0.c`)
 
 ```c
-void vADCTask(void *pv)
+QueueHandle_t g_notify_queue;
+
+int main(void)
 {
-    TickType_t xLastWake = xTaskGetTickCount();
-    uint32_t sample_count = 0;
-    for (;;) {
-        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(1));  /* 1 kHz */
+    BOARD_InitHardware();
+    PRINTF("\r\n=== RTOS Lab 09: Producer-Consumer IPC ===\r\n");
 
-        uint32_t next = (g_ring.write_idx + 1) % RING_BUF_SIZE;
-        if (next == g_ring.read_idx) {
-            g_ring.missed++;
-            continue;   /* buffer full — drop sample */
-        }
+    g_ring.write_idx = g_ring.read_idx = g_ring.missed = 0U;
 
-        /* Simulate ADC: ramp 0–4095 */
-        g_ring.data[g_ring.write_idx] = (int16_t)(sample_count % 4096);
-        sample_count++;
-        __DMB();                        /* store before index update */
-        g_ring.write_idx = next;
-        __DMB();                        /* index update before MU notify */
+    /* IPC queue: depth 8, element = uint32_t write_idx */
+    g_notify_queue = xQueueCreate(8U, sizeof(uint32_t));
+    configASSERT(g_notify_queue != NULL);
 
-        /* Notify CM33_1 every 16 samples (batched) */
-        if ((g_ring.write_idx & 0xF) == 0)
-            MU_TrySendMsg(MUA, 0, g_ring.write_idx);
-    }
+    xTaskCreate(vADCProducerTask, "ADCProd", 512, NULL, 3, NULL);  /* prio 3 */
+    xTaskCreate(vFIRConsumerTask, "FIRCons", 512, NULL, 2, NULL);  /* prio 2 */
+
+    PRINTF("[MAIN] starting scheduler — free heap: %u bytes\r\n",
+           (unsigned)xPortGetFreeHeapSize());
+    vTaskStartScheduler();
+    for (;;) {}
 }
 ```
 
-### Step 3 — Consumer on CM33_1 (FIR filter task)
+**Checkpoint A:** UART showing the startup banner and free heap size before the scheduler starts.
 
-```c
-static int16_t fir_h[8] = {1, 2, 3, 4, 4, 3, 2, 1};   /* 8-tap symmetric FIR */
-static int32_t fir_state[8] = {0};
-
-void MUA_IRQHandler(void)
-{
-    MU_ReceiveMsg(MUB, 0);   /* consume notification */
-    MU_ClearStatusFlags(MUB, kMU_Rx0FullFlag);
-    xTaskNotifyGiveFromISR(xFIRHandle, NULL);
-}
-
-void vFIRTask(void *pv)
-{
-    uint32_t total = 0;
-    for (;;) {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        __DMB();  /* ensure ring buffer data is visible */
-
-        while (g_ring.read_idx != g_ring.write_idx) {
-            int16_t sample = g_ring.data[g_ring.read_idx];
-            g_ring.read_idx = (g_ring.read_idx + 1) % RING_BUF_SIZE;
-
-            /* Simple FIR (shift register) */
-            memmove(&fir_state[1], &fir_state[0], 7 * sizeof(int32_t));
-            fir_state[0] = sample;
-            int32_t acc = 0;
-            for (int k = 0; k < 8; k++) acc += fir_state[k] * fir_h[k];
-            total++;
-        }
-
-        if ((total % 1000) == 0)
-            uart_printf("[CM1] processed %lu samples  missed=%lu\r\n",
-                        total, g_ring.missed);
-    }
-}
-```
-
-**Checkpoint C:** UART from CM33_1 showing processed sample count and zero missed samples at 1 kHz.
-
-> **Question C1:** Remove both `__DMB()` calls on the producer side, rebuild, and run. Do you observe incorrect FIR outputs or missed samples? (This may be platform-dependent — if the bug doesn't manifest, explain theoretically why it could.) Re-add the barriers before continuing.
-
-> **Question C2:** The ring buffer uses `volatile` on the indices. Is `volatile` sufficient to guarantee correctness on a multi-core system? What does `volatile` guarantee vs what `__DMB()` guarantees?
+> **Question A1:** The producer runs at priority 3 and the consumer at priority 2. What happens to the consumer task the instant `xQueueSend` posts a notification — does it run immediately or wait until the producer yields? Explain using FreeRTOS preemption rules.
 
 ---
 
-## Part D — Comparison: MU Direct vs Ring Buffer
+## Part B — ADC Producer Task
 
-Run both configurations with a 1 kHz producer for 10 seconds. Measure:
+### Step 1 — Implement `vADCProducerTask`
 
-| Metric | MU direct (Part B) | Ring buffer (Part C) |
-|--------|-------------------|---------------------|
-| Max throughput (samples/s) | | |
-| Latency per sample (cycles) | | |
-| Missed samples at 1 kHz | | |
-| CM33_0 CPU load (%) | | |
+```c
+/* adc_producer.c */
+extern QueueHandle_t g_notify_queue;
 
-Measure CM33_0 CPU load using `vTaskGetRunTimeStats` (enable `configGENERATE_RUN_TIME_STATS = 1` and use DWT as the timer source).
+void vADCProducerTask(void *pvParameters)
+{
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xPeriod = pdMS_TO_TICKS(10);  /* 100 Hz */
+    uint32_t sample_count = 0;
 
-**Checkpoint D:** Filled comparison table with measured values.
+    for (;;)
+    {
+        vTaskDelayUntil(&xLastWakeTime, xPeriod);
+
+        int16_t sample = simulate_adc_sample();  /* LFSR pseudo-random 12-bit */
+
+        uint32_t next = (g_ring.write_idx + 1U) % RING_BUF_SIZE;
+        if (next == g_ring.read_idx) {
+            g_ring.missed++;
+            continue;   /* buffer full — drop */
+        }
+
+        g_ring.data[g_ring.write_idx] = sample;
+        __DMB();                                    /* store before index */
+        g_ring.write_idx = next;
+        __DMB();                                    /* index before queue send */
+
+        /* Part C: record send timestamp */
+        g_latency.send_cycles = DWT->CYCCNT;
+        __DMB();
+
+        uint32_t widx = g_ring.write_idx;
+        xQueueSend(g_notify_queue, &widx, 0);       /* non-blocking */
+
+        if (++sample_count % 100U == 0U)
+            PRINTF("[ADC] produced %lu  missed=%lu  heap=%u\r\n",
+                   (unsigned long)sample_count,
+                   (unsigned long)g_ring.missed,
+                   (unsigned)xPortGetFreeHeapSize());
+    }
+}
+```
+
+### Step 2 — Build and flash
+
+```bash
+cd cm33_0 && make && make flash
+```
+
+Observe the ADC messages every 1 second (100 samples × 10 ms period). Missed count should be 0 at this stage with only the producer running.
+
+**Checkpoint B:** UART showing ADC producer printing every 1 s with `missed=0`.
+
+> **Question B1:** The producer uses `vTaskDelayUntil` instead of `vTaskDelay`. What is the difference, and why does it matter for a 100 Hz periodic task?
+
+---
+
+## Part C — FIR Consumer Task
+
+### Step 1 — Implement `vFIRConsumerTask`
+
+```c
+/* fir_consumer.c */
+extern QueueHandle_t g_notify_queue;
+
+static int32_t fir_filter(int16_t new_sample)
+{
+    static int16_t history[4] = {0};
+    static uint8_t idx = 0;
+    history[idx] = new_sample;
+    idx = (uint8_t)((idx + 1U) % 4U);
+    int32_t acc = 0;
+    for (uint8_t i = 0; i < 4U; i++) acc += history[i];
+    return acc / 4;  /* 4-tap moving average */
+}
+
+void vFIRConsumerTask(void *pvParameters)
+{
+    uint32_t consumed = 0;
+    TickType_t report_tick = xTaskGetTickCount();
+
+    for (;;)
+    {
+        uint32_t dummy;
+        xQueueReceive(g_notify_queue, &dummy, pdMS_TO_TICKS(100));
+
+        /* Part C: record receive timestamp */
+        g_latency.recv_cycles = DWT->CYCCNT;
+
+        __DMB();  /* ensure write_idx is visible */
+
+        while (g_ring.read_idx != g_ring.write_idx) {
+            int16_t raw      = g_ring.data[g_ring.read_idx];
+            int32_t filtered = fir_filter(raw);
+            g_ring.read_idx  = (g_ring.read_idx + 1U) % RING_BUF_SIZE;
+            consumed++;
+            (void)filtered;
+        }
+
+        TickType_t now = xTaskGetTickCount();
+        if ((now - report_tick) >= pdMS_TO_TICKS(1000)) {
+            report_tick = now;
+            PRINTF("[FIR] consumed=%lu  missed=%lu  heap=%u\r\n",
+                   (unsigned long)consumed,
+                   (unsigned long)g_ring.missed,
+                   (unsigned)xPortGetFreeHeapSize());
+
+            if (g_latency.send_cycles != 0U) {
+                uint32_t lat = g_latency.recv_cycles - g_latency.send_cycles;
+                PRINTF("[FIR] IPC latency: %lu cycles (~%lu ns @ 150 MHz)\r\n",
+                       (unsigned long)lat,
+                       (unsigned long)(lat * 1000UL / 150UL));
+            }
+        }
+    }
+}
+```
+
+**Checkpoint C:** UART showing both producer and consumer messages with `missed=0` sustained over 10 seconds.
+
+> **Question C1:** Remove both `__DMB()` calls on the producer side, rebuild, and run. Do you observe any incorrect FIR outputs or missed samples? (This may be platform-dependent — if the bug doesn't manifest, explain theoretically why it could.) Re-add the barriers before continuing.
+
+> **Question C2:** The ring buffer uses `volatile` on the indices. Is `volatile` sufficient to guarantee correctness? What does `volatile` guarantee vs what `__DMB()` guarantees?
+
+---
+
+## Part D — Latency and Throughput Analysis
+
+### Step 1 — IPC notification latency
+
+After running for 10 seconds, observe the IPC latency printed by the consumer. This measures the time from `xQueueSend` in the producer to `xQueueReceive` returning in the consumer, expressed in DWT cycles.
+
+> **Question D1:** Convert the measured IPC latency cycles to nanoseconds at 150 MHz. What are the components of this latency? (Hint: consider FreeRTOS scheduler overhead, priority difference between tasks, and context-switch cost.)
+
+### Step 2 — Increase producer rate
+
+Change the producer period from `pdMS_TO_TICKS(10)` (100 Hz) to `pdMS_TO_TICKS(1)` (1 kHz). Observe whether `missed` increases. Record results in the table below.
+
+| Producer rate | Consumed/s | Missed/s | IPC latency (cycles) |
+|--------------|-----------|---------|---------------------|
+| 100 Hz       |           |         |                     |
+| 1 kHz        |           |         |                     |
+
+**Checkpoint D:** Filled table with measured values at both rates.
+
+> **Question D2:** At 1 kHz, why might `missed` increase? Is the bottleneck the ring buffer, the FreeRTOS queue depth, or the consumer processing time? Explain how you would determine which.
 
 ---
 
@@ -334,13 +301,13 @@ Measure CM33_0 CPU load using `vTaskGetRunTimeStats` (enable `configGENERATE_RUN
 
 | # | Item |
 |---|------|
-| 1 | Part A UART — both core startup messages |
-| 2 | Part B2 UART — MU latency measurement (cycles + nanoseconds) |
-| 3 | Part C UART — 10 seconds of CM33_1 processing with zero missed samples |
-| 4 | Linker script excerpt showing `.sram4` section |
-| 5 | Part D comparison table |
-| 6 | Written answers to Questions A1, B1, C1, C2 |
-| 7 | `shared_mem.h` with ring buffer struct |
+| 1 | Part A UART — startup banner with free heap size |
+| 2 | Part B UART — ADC producer printing at 100 Hz with `missed=0` |
+| 3 | Part C UART — 10 seconds of producer + consumer with `missed=0` |
+| 4 | Part D comparison table — 100 Hz vs 1 kHz |
+| 5 | Written answers to Questions A1, B1, C1, C2, D1, D2 |
+| 6 | `shared_mem.h` ring buffer struct |
+| 7 | `adc_producer.c` and `fir_consumer.c` source listings |
 
 ---
 
@@ -348,12 +315,12 @@ Measure CM33_0 CPU load using `vTaskGetRunTimeStats` (enable `configGENERATE_RUN
 
 | Concept | Where you saw it |
 |---------|-----------------|
-| AMP dual-core boot via SYSCON | Part A |
-| MU direct 32-bit messaging | Part B |
-| IPC latency measurement with DWT | Part B |
-| Shared SRAM ring buffer | Part C |
-| DMB memory barriers | Part C |
-| Throughput vs latency trade-off | Part D |
+| Lock-free SPSC ring buffer | Part B & C |
+| DMB memory barriers — store ordering | Part C `__DMB()` |
+| FreeRTOS queue as IPC notification | Parts B–D |
+| Producer-consumer task coordination | Parts B & C |
+| IPC latency measurement with DWT | Part C |
+| Throughput vs drop-rate trade-off | Part D |
 
 ---
 
@@ -361,7 +328,7 @@ Measure CM33_0 CPU load using `vTaskGetRunTimeStats` (enable `configGENERATE_RUN
 
 | Resource | Relevant sections |
 |----------|-------------------|
-| NXP MCXN236 Reference Manual | Chapter MU (Messaging Unit), Chapter SYSCON |
-| NXP MCUXpresso SDK | `fsl_mu.h`, multicore examples |
-| ARM Cortex-M33 TRM | §A3.4 Memory ordering |
-| Barry, *Mastering the FreeRTOS Kernel* | `xTaskNotifyGiveFromISR`, `vTaskGetRunTimeStats` |
+| ARM Cortex-M33 TRM | §A3.4 Memory ordering, §DMB |
+| Barry, *Mastering the FreeRTOS Kernel* | `xQueueSend`, `xQueueReceive`, `vTaskDelayUntil` |
+| NXP MCUXpresso SDK | `fsl_debug_console.h`, `BOARD_InitHardware` |
+| Herlihy & Shavit, *The Art of Multiprocessor Programming* | Ch. 3 (concurrent queues, lock-free) |

@@ -60,16 +60,15 @@ At 150 MHz, 1 cycle = 6.67 ns. The counter rolls over after 2³² cycles ≈ 28.
 ```
 lab06_wcet_dwt/
 ├── Makefile
-├── linker_MCXN236.ld
-├── src/
-│   ├── main.c              ← DWT init, task creation
-│   ├── dwt.h               ← DWT enable/read macros
-│   ├── workload.c/.h       ← the functions to be measured
-│   ├── latency_test.c/.h   ← Part B: GPIO ISR latency test
-│   ├── FreeRTOSConfig.h
-│   └── uart.h / uart.c
-└── FreeRTOS-Kernel/
+└── src/
+    ├── main.c              ← DWT init, task creation
+    ├── dwt.h               ← DWT enable/read macros (header-only)
+    ├── workload.c/.h       ← functions to be measured
+    ├── latency_test.c/.h   ← Part B: GPIO ISR latency test
+    └── FreeRTOSConfig.h
 ```
+
+All console output uses `PRINTF()` from `fsl_debug_console.h` — no separate UART driver is required.
 
 ---
 
@@ -77,12 +76,12 @@ lab06_wcet_dwt/
 
 ### Step 1 — Enable DWT
 
-In `dwt.h`:
+`dwt.h` is a header-only helper. It includes `fsl_device_registers.h` (which pulls in the MCXN236 device header before CMSIS) so that `__FPU_PRESENT` and `__DSP_PRESENT` are defined correctly:
 
 ```c
 #ifndef DWT_H
 #define DWT_H
-#include "core_cm33.h"
+#include "fsl_device_registers.h"   /* device header must come before CMSIS */
 
 static inline void DWT_Enable(void)
 {
@@ -102,6 +101,8 @@ static inline uint32_t DWT_GetCycles(void)
 #define DWT_STOP()   uint32_t _dwt_elapsed = DWT_GetCycles() - _dwt_start
 #endif
 ```
+
+> **Note:** Using `#include "core_cm33.h"` directly will fail with errors about `__FPU_PRESENT` being undefined. Always include `fsl_device_registers.h` instead — it sets the device-specific macros before including the CMSIS core headers.
 
 ### Step 2 — Implement the workload functions
 
@@ -150,67 +151,36 @@ uint32_t crc32(const uint8_t *data, uint32_t len)
 
 void vWcetMeasureTask(void *pv)
 {
-    static int16_t arr[ARRAY_SIZE];
-    static int16_t sorted[ARRAY_SIZE];
-    static int16_t reverse[ARRAY_SIZE];
-    static int16_t random_arr[ARRAY_SIZE];
+    static int16_t sorted[ARRAY_SIZE], reverse[ARRAY_SIZE], arr[ARRAY_SIZE];
     static int16_t fir_h[16] = {1,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1};
 
-    /* Prepare test inputs */
     for (int i = 0; i < ARRAY_SIZE; i++) {
         sorted[i]  = (int16_t)i;
         reverse[i] = (int16_t)(ARRAY_SIZE - 1 - i);
-        random_arr[i] = (int16_t)((i * 37 + 13) % ARRAY_SIZE);
     }
 
     uint32_t best, worst, sum, cycles;
-    best = UINT32_MAX; worst = 0; sum = 0;
 
     /* --- Bubble sort WCET --- */
-    uart_printf("\r\n=== bubble_sort(%d elements) ===\r\n", ARRAY_SIZE);
+    PRINTF("\r\n=== bubble_sort(%d elements) ===\r\n", ARRAY_SIZE);
+    best = UINT32_MAX; worst = 0; sum = 0;
 
-    /* Best case: already sorted */
-    memcpy(arr, sorted, sizeof(sorted));
-    DWT_START();
-    bubble_sort(arr, ARRAY_SIZE);
-    DWT_STOP();
-    uart_printf("  sorted input (best):   %lu cycles  (%.2f us)\r\n",
-                _dwt_elapsed, _dwt_elapsed / 150.0f);
-
-    /* Worst case: reverse sorted */
     for (int r = 0; r < NUM_RUNS; r++) {
         memcpy(arr, reverse, sizeof(reverse));
         DWT_START();
         bubble_sort(arr, ARRAY_SIZE);
         DWT_STOP();
         cycles = _dwt_elapsed;
-        if (cycles < best) best = cycles;
+        if (cycles < best)  best  = cycles;
         if (cycles > worst) worst = cycles;
         sum += cycles;
     }
-    uart_printf("  reverse-sorted (%d runs): best=%lu  worst=%lu  avg=%lu cycles\r\n",
+    PRINTF("  reverse-sorted (%d runs): best=%lu  worst=%lu  avg=%lu cycles\r\n",
                 NUM_RUNS, best, worst, sum / NUM_RUNS);
-    uart_printf("  WCET with 20%% margin:    %lu cycles  (%.2f us)\r\n",
+    PRINTF("  WCET with 20%% margin:    %lu cycles  (%.2f us)\r\n",
                 (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
 
-    /* --- FIR filter WCET --- */
-    uart_printf("\r\n=== fir_filter(16 taps) ===\r\n");
-    best = UINT32_MAX; worst = 0; sum = 0;
-    for (int r = 0; r < NUM_RUNS; r++) {
-        DWT_START();
-        volatile int32_t result = fir_filter(random_arr, fir_h, 16);
-        (void)result;
-        DWT_STOP();
-        cycles = _dwt_elapsed;
-        if (cycles < best) best = cycles;
-        if (cycles > worst) worst = cycles;
-        sum += cycles;
-    }
-    uart_printf("  best=%lu  worst=%lu  avg=%lu cycles\r\n", best, worst, sum/NUM_RUNS);
-    uart_printf("  WCET with 20%% margin:    %lu cycles  (%.2f us)\r\n",
-                (uint32_t)(worst * 1.2f), worst * 1.2f / 150.0f);
-
-    uart_printf("\r\nMeasurement complete.\r\n");
+    PRINTF("\r\nMeasurement complete.\r\n");
     vTaskDelete(NULL);
 }
 ```
@@ -218,7 +188,7 @@ void vWcetMeasureTask(void *pv)
 ### Step 4 — Build, flash, and record results
 
 ```bash
-make setup && make && make flash
+make && make flash
 ```
 
 Copy the full terminal output into a table in your report.
@@ -235,53 +205,75 @@ Copy the full terminal output into a table in your report.
 
 ## Part B — Interrupt Latency Measurement
 
-### Step 1 — Set up the GPIO toggling ISR
+### Step 1 — GPIO pin assignments
 
-Wire a jumper from `P1_0` (output, driven by signal generator or a software toggle task) to `P1_1` (input, interrupt on rising edge). The ISR immediately toggles `P1_2` (output to oscilloscope probe).
+| Pin | Role |
+|-----|------|
+| `P1_0` | Output — toggle source (driven by `vGpioToggleTask` at 1 kHz) |
+| `P1_1` | Input — rising-edge interrupt (wire to `P1_0` with a jumper) |
+| `P1_2` | Output — ISR response (scope probe here) |
+
+### Step 2 — Configure GPIO and interrupt
+
+The MCXN236 SDK GPIO API uses `GPIO_SetPinInterruptConfig` for the interrupt condition; the struct `gpio_pin_config_t` only holds direction and output logic — there is no third field for interrupt mode:
 
 ```c
 /* latency_test.c */
-void GPIO1_IRQHandler(void)
+void latency_test_init(void)
 {
-    GPIO_ClearPinsInterruptFlags(GPIO1, 1u << 1);
-    GPIO_TogglePinsOutput(GPIO1, 1u << 2);  /* output as fast as possible */
+    /* P1_1: input with rising-edge interrupt */
+    gpio_pin_config_t in_cfg = {kGPIO_DigitalInput, 0};
+    GPIO_PinInit(GPIO1, 1, &in_cfg);
+    GPIO_SetPinInterruptConfig(GPIO1, 1, kGPIO_InterruptRisingEdge);
+
+    /* P1_0 and P1_2: outputs */
+    gpio_pin_config_t out_cfg = {kGPIO_DigitalOutput, 0};
+    GPIO_PinInit(GPIO1, 0, &out_cfg);
+    GPIO_PinInit(GPIO1, 2, &out_cfg);
+
+    /* Enable GPIO1 IRQ at a priority compatible with FreeRTOS fromISR calls */
+    NVIC_SetPriority(GPIO1_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1U);
+    EnableIRQ(GPIO1_IRQn);
 }
 ```
 
-### Step 2 — Configure GPIO and NVIC
+> **API note:** The legacy `GPIO_EnableInterrupts`, `kGPIO_IntRisingEdge`, `kGPIO_NoIntmode` names do not exist in this SDK version. Use `GPIO_SetPinInterruptConfig` with `kGPIO_InterruptRisingEdge`.
 
-```c
-/* Input: P1_1 rising edge interrupt */
-gpio_pin_config_t in_cfg  = { kGPIO_DigitalInput,  0, kGPIO_IntRisingEdge };
-GPIO_PinInit(GPIO1, 1, &in_cfg);
-GPIO_EnableInterrupts(GPIO1, 1u << 1);
-EnableIRQ(GPIO1_IRQn);
-
-/* Output: P1_2 */
-gpio_pin_config_t out_cfg = { kGPIO_DigitalOutput, 0, kGPIO_NoIntmode };
-GPIO_PinInit(GPIO1, 2, &out_cfg);
-```
-
-### Step 3 — Drive the input and measure
-
-**Option A — Logic analyser:** set `P1_0` toggling at 1 kHz from a software task; measure `P1_1`-rising to `P1_2`-rising on the analyser.
-
-**Option B — Oscilloscope:** probe `P1_1` (CH1) and `P1_2` (CH2); use rising-edge trigger on CH1; measure propagation delay.
-
-**Option C — DWT inside the ISR:**
+### Step 3 — GPIO ISR with DWT timestamp
 
 ```c
 void GPIO1_IRQHandler(void)
 {
-    uint32_t t_isr = DWT_GetCycles();   /* first thing in ISR */
-    GPIO_ClearPinsInterruptFlags(GPIO1, 1u << 1);
-    /* t_isr - t_gpio_assert = cycles from IRQ line assertion to here */
-    latency_buffer[latency_idx++ % 64] = t_isr - last_gpio_toggle;
-    GPIO_TogglePinsOutput(GPIO1, 1u << 2);
+    /* Capture cycle count at ISR entry — must be the very first statement */
+    uint32_t t_isr = DWT_GetCycles();
+
+    GPIO_PinClearInterruptFlag(GPIO1, 1);      /* clear interrupt source */
+    GPIO_PortToggle(GPIO1, 1u << 2);           /* toggle P1_2 for scope */
+
+    /* Store latency: cycles from GPIO toggle (in task) to ISR entry */
+    uint32_t idx = latency_idx % LATENCY_BUF_SIZE;
+    latency_buffer[idx] = t_isr - last_gpio_toggle;
+    latency_idx++;
 }
 ```
 
-Where `last_gpio_toggle` is set just before toggling `P1_0` in the generating task.
+The toggle task sets `last_gpio_toggle` just before asserting `P1_0`:
+
+```c
+void vGpioToggleTask(void *pv)
+{
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));  /* 1 kHz */
+        last_gpio_toggle = DWT_GetCycles();
+        GPIO_PortSet(GPIO1, 1u << 0);
+        vTaskDelay(1);
+        GPIO_PortClear(GPIO1, 1u << 0);
+    }
+}
+```
+
+> **API note (correct SDK names):** Use `GPIO_PinClearInterruptFlag`, `GPIO_PortToggle`, `GPIO_PortSet`, `GPIO_PortClear` — not the legacy `GPIO_ClearPinsInterruptFlags`, `GPIO_TogglePinsOutput`, `GPIO_SetPinsOutput`, `GPIO_ClearPinsOutput`.
 
 ### Step 4 — Measure with and without critical section
 
@@ -292,9 +284,8 @@ void vCriticalSectionTask(void *pv)
 {
     for (;;) {
         taskENTER_CRITICAL();
-        /* Simulate a long critical section — ISR is masked during this time */
         volatile uint32_t i = 0;
-        while (i++ < 150000) {}   /* ~1 ms at 150 MHz */
+        while (i++ < 150000u) {}   /* ~1 ms at 150 MHz */
         taskEXIT_CRITICAL();
         vTaskDelay(pdMS_TO_TICKS(5));
     }
@@ -307,7 +298,7 @@ void vCriticalSectionTask(void *pv)
 
 > **Question B2:** With the critical section active, what is the worst-case interrupt latency? Where does the extra latency come from? What FreeRTOS configuration parameter controls this?
 
-> **Question B3:** The ISR priority is set to `configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY - 1`. Why can this ISR still be deferred by `taskENTER_CRITICAL`? What priority would you set to make the ISR **non-maskable** by FreeRTOS?
+> **Question B3:** The ISR priority is set to `configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1`. Why can this ISR still be deferred by `taskENTER_CRITICAL`? What priority would you set to make the ISR **non-maskable** by FreeRTOS?
 
 ---
 
@@ -324,12 +315,11 @@ void vSortTask(void *pv)
     TickType_t xLastWake = xTaskGetTickCount();
     for (;;) {
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(50));
-        /* Prepare random input */
         for (int i = 0; i < ARRAY_SIZE; i++) arr[i] = (int16_t)(rand() % 1000);
         DWT_START();
         bubble_sort(arr, ARRAY_SIZE);
         DWT_STOP();
-        uart_printf("[SORT] %lu cycles  (%.2f us)\r\n",
+        PRINTF("[SORT] %lu cycles  (%.2f us)\r\n",
                     _dwt_elapsed, _dwt_elapsed / 150.0f);
     }
 }
@@ -374,4 +364,5 @@ Run with two background tasks also active (prio 1 and 2). Compare the measured c
 | Wilhelm et al. (2008) | "The worst-case execution time problem" (*ACM TECS*) |
 | ARM Cortex-M33 TRM | §DWT, §B2.3 exception entry |
 | NXP MCXN236 RM | §CoreDebug, §DWT |
+| NXP MCUXpresso SDK | `fsl_gpio.h` — `GPIO_SetPinInterruptConfig`, `GPIO_PortSet/Clear/Toggle` |
 | FreeRTOS docs | `taskENTER_CRITICAL`, `configMAX_SYSCALL_INTERRUPT_PRIORITY` |

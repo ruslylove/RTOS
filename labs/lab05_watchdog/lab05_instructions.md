@@ -13,8 +13,8 @@ By completing this lab you will be able to:
 
 1. **Induce** a deadlock between two tasks holding two mutexes in opposite order.
 2. **Prevent** deadlock using the resource-ordering convention.
-3. **Configure** the MCXN236 hardware watchdog (WDOG32) and observe a reset.
-4. **Implement** a software watchdog pattern using task notifications.
+3. **Configure** the MCXN236 hardware watchdog (WWDT — Window Watchdog Timer) and observe a reset.
+4. **Implement** a software watchdog pattern using task check-in flags.
 5. **Isolate** a hung task — log its identity and trigger a controlled reset.
 
 ---
@@ -39,9 +39,11 @@ A deadlock requires all four conditions simultaneously:
 
 FreeRTOS mutexes satisfy conditions 1–3 by design. Your task is to prevent condition 4 using **resource ordering**: assign a global lock order and always acquire resources in ascending order.
 
-### Hardware watchdog
+### Hardware watchdog — WWDT
 
-The MCXN236 WDOG32 generates a system reset if not refreshed within a configured window. This is the last line of defence against a hung system.
+The MCXN236 uses a **Window Watchdog Timer (WWDT)** peripheral (`WWDT0`), clocked from the internal watchdog oscillator. It generates a system reset if the counter is not refreshed (kicked) within a configured window. This is the last line of defence against a hung system.
+
+> **Note:** The MCXN236 does **not** have a WDOG32 module. The correct SDK driver is `fsl_wwdt.h`.
 
 ---
 
@@ -50,15 +52,14 @@ The MCXN236 WDOG32 generates a system reset if not refreshed within a configured
 ```
 lab05_watchdog/
 ├── Makefile
-├── linker_MCXN236.ld
-├── src/
-│   ├── main.c               ← task creation, WDOG init
-│   ├── deadlock_tasks.c/.h  ← Part A & B
-│   ├── watchdog.c/.h        ← Part C & D hardware + software watchdog
-│   ├── FreeRTOSConfig.h
-│   └── uart.h / uart.c
-└── FreeRTOS-Kernel/
+└── src/
+    ├── main.c               ← task creation, reset-cause check
+    ├── deadlock_tasks.c/.h  ← Part A & B
+    ├── watchdog.c/.h        ← Part C & D: hardware + software watchdog
+    └── FreeRTOSConfig.h
 ```
+
+All console output uses `PRINTF()` from `fsl_debug_console.h` — no separate UART driver is required.
 
 ---
 
@@ -66,10 +67,8 @@ lab05_watchdog/
 
 ### Step 1 — Implement the deadlock scenario
 
-Create two mutexes and two tasks that acquire them in opposite order:
-
 ```c
-/* main.c */
+/* main.c — set LAB_PART 1 */
 SemaphoreHandle_t xMutexA;
 SemaphoreHandle_t xMutexB;
 
@@ -83,12 +82,12 @@ void vTaskAlpha(void *pv)  /* prio 2 */
 {
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        uart_printf("[A] taking MutexA...\r\n");
+        PRINTF("[A] taking MutexA...\r\n");
         xSemaphoreTake(xMutexA, portMAX_DELAY);
-        uart_printf("[A] took MutexA. Taking MutexB...\r\n");
+        PRINTF("[A] took MutexA. Taking MutexB...\r\n");
         vTaskDelay(pdMS_TO_TICKS(5));   /* window for B to acquire MutexB */
         xSemaphoreTake(xMutexB, portMAX_DELAY);
-        uart_printf("[A] took both — doing work\r\n");
+        PRINTF("[A] took both — doing work\r\n");
         xSemaphoreGive(xMutexB);
         xSemaphoreGive(xMutexA);
     }
@@ -98,12 +97,12 @@ void vTaskBeta(void *pv)   /* prio 2 */
 {
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        uart_printf("[B] taking MutexB...\r\n");
+        PRINTF("[B] taking MutexB...\r\n");
         xSemaphoreTake(xMutexB, portMAX_DELAY);
-        uart_printf("[B] took MutexB. Taking MutexA...\r\n");
+        PRINTF("[B] took MutexB. Taking MutexA...\r\n");
         vTaskDelay(pdMS_TO_TICKS(5));
         xSemaphoreTake(xMutexA, portMAX_DELAY);  /* ← opposite order to Task A */
-        uart_printf("[B] took both — doing work\r\n");
+        PRINTF("[B] took both — doing work\r\n");
         xSemaphoreGive(xMutexA);
         xSemaphoreGive(xMutexB);
     }
@@ -113,10 +112,10 @@ void vTaskBeta(void *pv)   /* prio 2 */
 ### Step 2 — Build, flash, and observe
 
 ```bash
-make setup && make && make flash
+make LAB_PART=1 && make flash
 ```
 
-Watch the terminal. Within a few seconds, both `[A]` and `[B]` will stop printing "took both" — the system is deadlocked. The UART will show each task stuck waiting.
+Watch the terminal. Within a few seconds, both `[A]` and `[B]` will stop printing "took both" — the system is deadlocked.
 
 **Checkpoint A:** UART capture showing the last lines before deadlock, with both tasks blocked.
 
@@ -130,30 +129,31 @@ Watch the terminal. Within a few seconds, both `[A]` and `[B]` will stop printin
 
 ### Step 1 — Apply resource ordering
 
-Assign a global lock order constant and enforce it in both tasks:
-
 ```c
-/* deadlock_tasks.c — FIXED */
+/* deadlock_tasks.c — FIXED, LAB_PART 2 */
 #define LOCK_ORDER_MUTEX_A  1
 #define LOCK_ORDER_MUTEX_B  2
 /* Rule: always acquire in ascending order */
-
-void vTaskAlpha(void *pv)  /* unchanged — already A then B (correct order) */
-{ /* ... same as before ... */ }
 
 void vTaskBeta(void *pv)   /* FIXED: acquire A before B */
 {
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        uart_printf("[B] taking MutexA (order fix)...\r\n");
+        PRINTF("[B] taking MutexA (order fix)...\r\n");
         xSemaphoreTake(xMutexA, portMAX_DELAY);  /* A first */
-        uart_printf("[B] taking MutexB...\r\n");
+        PRINTF("[B] taking MutexB...\r\n");
         xSemaphoreTake(xMutexB, portMAX_DELAY);  /* B second */
-        uart_printf("[B] took both — doing work\r\n");
+        PRINTF("[B] took both — doing work\r\n");
         xSemaphoreGive(xMutexB);
         xSemaphoreGive(xMutexA);
     }
 }
+```
+
+Build and flash with:
+
+```bash
+make LAB_PART=2 && make flash
 ```
 
 ### Step 2 — Verify no deadlock
@@ -168,36 +168,41 @@ Run for at least 60 seconds. Both tasks should continue printing "took both" ind
 
 ---
 
-## Part C — Hardware Watchdog
+## Part C — Hardware Watchdog (WWDT)
 
-### Step 1 — Configure WDOG32
+### Step 1 — Configure WWDT0
 
-The MCXN236 WDOG32 module resets the chip if not refreshed within a timeout window.
+The MCXN236 WWDT module resets the chip if not refreshed within a timeout window. The watchdog oscillator frequency is queried at runtime via `CLOCK_GetWdtClkFreq(0)`.
 
 ```c
-/* watchdog.c */
-#include "fsl_wdog32.h"
+/* watchdog.c — LAB_PART 3 */
+#include "fsl_wwdt.h"
+#include "fsl_clock.h"
 
 void WDOG_Init_1s(void)
 {
-    wdog32_config_t cfg;
-    WDOG32_GetDefaultConfig(&cfg);
-    cfg.timeoutValue  = 0x100U;   /* ~1 second at LPO 128 Hz */
-    cfg.enableWdog32  = true;
-    cfg.clockSource   = kWDOG32_ClockSourceLpoClk;
-    cfg.prescaler     = kWDOG32_ClockPrescalerDivide1;
-    WDOG32_Init(WDOG0, &cfg);
+    CLOCK_EnableClock(kCLOCK_Wwdt0);
+
+    uint32_t wdtFreq = CLOCK_GetWdtClkFreq(0U);
+    if (wdtFreq == 0U) wdtFreq = 1000000U;  /* fallback: 1 MHz */
+
+    wwdt_config_t cfg;
+    WWDT_GetDefaultConfig(&cfg);
+    cfg.enableWwdt          = true;
+    cfg.enableWatchdogReset = true;
+    cfg.windowValue         = 0xFFFFFFU;  /* no window restriction */
+    cfg.timeoutValue        = wdtFreq;    /* ~1 s timeout */
+    cfg.clockFreq_Hz        = wdtFreq;
+    WWDT_Init(WWDT0, &cfg);
 }
 
 void WDOG_Kick(void)
 {
-    WDOG32_Refresh(WDOG0);
+    WWDT_Refresh(WWDT0);
 }
 ```
 
 ### Step 2 — Normal operation — kick the watchdog
-
-Create a high-priority watchdog task that kicks every 500 ms:
 
 ```c
 void vWatchdogTask(void *pv)  /* prio 4 — highest */
@@ -206,41 +211,56 @@ void vWatchdogTask(void *pv)  /* prio 4 — highest */
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(500));
         WDOG_Kick();
-        uart_printf("[WDG] kicked\r\n");
+        PRINTF("[WDG] kicked  t=%lu ms\r\n", (unsigned long)xTaskGetTickCount());
     }
 }
 ```
 
-Run for 10 seconds. The system should run normally.
+Build and flash:
+
+```bash
+make LAB_PART=3 && make flash
+```
+
+Run for 10 seconds. The system should run normally with kick messages every 500 ms.
 
 ### Step 3 — Trigger the watchdog reset
 
-Add a `#define SIMULATE_HANG 1` build flag. When set, `vWatchdogTask` sleeps for 2 seconds instead of kicking:
+Build with `SIMULATE_HANG=1`. When set, `vWatchdogTask` delays 2 seconds instead of kicking:
 
 ```c
-#ifdef SIMULATE_HANG
+#if SIMULATE_HANG
+    PRINTF("[WDG] simulating hang — NOT kicking!\r\n");
     vTaskDelay(pdMS_TO_TICKS(2000));   /* miss the deadline → watchdog fires */
 #else
     WDOG_Kick();
 #endif
 ```
 
-Build with `make HANG=1 && make HANG=1 flash`.
+```bash
+make LAB_PART=3 CFLAGS_EXTRA="-DSIMULATE_HANG=1" && make flash
+```
 
-Observe the board reset. After reset, the firmware checks `WDOG32_GetStatusFlags(WDOG0)` and prints the reset cause:
+After the reset, the firmware checks `WWDT_GetStatusFlags(WWDT0)`:
 
 ```c
-/* In main, before scheduler starts: */
-if (WDOG32_GetStatusFlags(WDOG0) & kWDOG32_InterruptFlag) {
-    uart_printf("[BOOT] Reset caused by watchdog!\r\n");
+/* main.c — checked before scheduler starts */
+if (WWDT_GetStatusFlags(WWDT0) & kWWDT_TimeoutFlag)
+{
+    PRINTF("[BOOT] *** last reset was caused by WWDT timeout ***\r\n");
+    WWDT_ClearStatusFlags(WWDT0, kWWDT_TimeoutFlag);
+}
+else
+{
+    PRINTF("[BOOT] (no watchdog reset on this boot)\r\n");
 }
 ```
 
-**Checkpoint C:** UART capture showing `[BOOT] Reset caused by watchdog!` on the reboot following the simulated hang.
+**Checkpoint C:** UART capture showing `*** last reset was caused by WWDT timeout ***` on the reboot following the simulated hang.
 
-> **Question C1:** The WDOG32 uses the LPO (Low-Power Oscillator) at 128 Hz. Calculate the exact timeout in milliseconds for `timeoutValue = 0x100`. Why is a low-power oscillator used rather than the main system clock?
+> **Question C1:** The WWDT uses the internal watchdog oscillator (typically ~1 MHz on MCXN236). How does `timeoutValue = wdtFreq` give approximately 1 second? Why is a dedicated low-frequency oscillator used for the watchdog rather than the main 150 MHz PLL?
 
-> **Question C2:** A **window watchdog** adds a minimum refresh time — you cannot kick too early OR too late. How would you configure a window watchdog to catch a "too-fast" kick (indicating the kick loop has gone haywire)? Sketch the `cfg.windowValue` setting.
+> **Question C2:** A **window watchdog** resets the chip if you kick too early OR too late. How would you set `cfg.windowValue` to require the kick to arrive only in the last 50 ms of the 1 s window? Sketch the timing diagram.
 
 ---
 
@@ -248,17 +268,15 @@ if (WDOG32_GetStatusFlags(WDOG0) & kWDOG32_InterruptFlag) {
 
 ### Step 1 — Multi-task monitoring pattern
 
-The hardware watchdog is kicked by a dedicated monitor task that only kicks if **all** worker tasks have checked in during the last interval:
-
 ```c
-/* watchdog.c — software monitor */
+/* watchdog.c — LAB_PART 4 */
 #define NUM_WORKERS  3
-static volatile uint8_t  worker_alive[NUM_WORKERS];
+static volatile uint8_t worker_alive[NUM_WORKERS];
 
-/* Called by each worker task every cycle */
 void wdog_checkin(uint8_t worker_id)
 {
-    worker_alive[worker_id] = 1;
+    if (worker_id < NUM_WORKERS)
+        worker_alive[worker_id] = 1;
 }
 
 void vWatchdogMonitor(void *pv)  /* prio 4 */
@@ -267,48 +285,48 @@ void vWatchdogMonitor(void *pv)  /* prio 4 */
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(500));
 
-        /* Check all workers have checked in */
         bool all_ok = true;
         for (int i = 0; i < NUM_WORKERS; i++) {
             if (!worker_alive[i]) {
-                uart_printf("[WDG] worker %d silent — NOT kicking!\r\n", i);
+                PRINTF("[WDG] worker %d silent — NOT kicking!\r\n", i);
                 all_ok = false;
             }
-            worker_alive[i] = 0;   /* reset for next interval */
+            worker_alive[i] = 0;
         }
 
         if (all_ok) {
             WDOG_Kick();
-            uart_printf("[WDG] all workers OK — kicked\r\n");
+            PRINTF("[WDG] all workers OK — kicked  t=%lu ms\r\n",
+                   (unsigned long)xTaskGetTickCount());
         }
-        /* If not all OK, watchdog expires → reset */
     }
 }
 
-/* Worker task (one of NUM_WORKERS) */
 void vWorkerTask(void *pv)
 {
     uint8_t id = (uint8_t)(uintptr_t)pv;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(200));
+
+        /* Worker 1 hangs after 5 s to demonstrate detection */
+        if (id == 1 && xTaskGetTickCount() > pdMS_TO_TICKS(5000)) {
+            PRINTF("[W%d] hanging — no more check-ins!\r\n", id);
+            for (;;) {}
+        }
+
         wdog_checkin(id);
-        uart_printf("[W%d] working\r\n", id);
+        PRINTF("[W%d] working  t=%lu ms\r\n", id, (unsigned long)xTaskGetTickCount());
     }
 }
 ```
 
-### Step 2 — Simulate a hanging worker
+### Step 2 — Flash and observe
 
-Add a flag to stop one worker checking in after 5 seconds:
-
-```c
-if (id == 1 && xTaskGetTickCount() > pdMS_TO_TICKS(5000)) {
-    /* Hang — infinite loop, no checkin */
-    for (;;) {}
-}
+```bash
+make LAB_PART=4 && make flash
 ```
 
-Observe: after the hang, the monitor stops kicking within 500 ms, and the watchdog fires ~1 second later.
+Observe: after ~5 s, worker 1 hangs. The monitor reports it silent, stops kicking within 500 ms, and the WWDT fires ~1 s later, causing a reset.
 
 **Checkpoint D:** UART capture showing the monitor detecting the silent worker, then the board reset and reboot message.
 
@@ -325,7 +343,7 @@ Observe: after the hang, the monitor stops kicking within 500 ms, and the watchd
 | 1 | Part A UART capture — deadlock state visible |
 | 2 | Part A resource-allocation graph diagram (hand-drawn or tool) |
 | 3 | Part B UART capture — 60+ seconds of normal operation |
-| 4 | Part C UART capture — watchdog reset cause message on reboot |
+| 4 | Part C UART capture — WWDT reset cause message on reboot |
 | 5 | Part D UART capture — monitor detecting silent worker + reset |
 | 6 | Written answers to Questions A1–A2, B1–B2, C1–C2, D1–D2 |
 
@@ -338,7 +356,7 @@ Observe: after the hang, the monitor stops kicking within 500 ms, and the watchd
 | Deadlock induction — opposite lock order | Part A |
 | Coffman condition 4 — circular wait | Part A diagram |
 | Resource ordering — deadlock prevention | Part B |
-| WDOG32 hardware watchdog configuration | Part C |
+| WWDT hardware watchdog configuration | Part C |
 | Reset cause detection at boot | Part C |
 | Software watchdog with per-task monitoring | Part D |
 
@@ -350,5 +368,5 @@ Observe: after the hang, the monitor stops kicking within 500 ms, and the watchd
 |----------|-------------------|
 | Coffman, Elphick & Shoshani (1971) | "System deadlocks" (*ACM Computing Surveys*) |
 | Barry, *Mastering the FreeRTOS Kernel* | Ch. 6 (mutexes) |
-| NXP MCXN236 Reference Manual | Chapter WDOG32 |
-| NXP MCUXpresso SDK | `fsl_wdog32.h`, `WDOG32_GetDefaultConfig` |
+| NXP MCXN236 Reference Manual | Chapter WWDT (Window Watchdog Timer) |
+| NXP MCUXpresso SDK | `fsl_wwdt.h`, `WWDT_GetDefaultConfig`, `WWDT_Refresh` |
