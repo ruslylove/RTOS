@@ -1,0 +1,8 @@
+{
+  "cmake.configureOnOpen": false,
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.files.exclude": { "**/.vscode": true, "**/__repo__": true },
+  "C_Cpp.exclusionPolicy": "checkFolders",
+  "cortex-debug.armToolchainPath": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin",
+  "cortex-debug.pyocdPath": "C:/Development/RTOS/.venv/Scripts/pyocd.exe"
+}

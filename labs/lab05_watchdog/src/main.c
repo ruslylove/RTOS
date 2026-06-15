@@ -15,6 +15,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "board.h"
+#include "app.h"
 #include "fsl_debug_console.h"
 #include "deadlock_tasks.h"
 #include "watchdog.h"

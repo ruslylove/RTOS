@@ -1,0 +1,3 @@
+C:/Development/RTOS/labs/lab04_priority_inversion/build/debug/CMakeFiles/lab04.dir
+C:/Development/RTOS/labs/lab04_priority_inversion/build/debug/CMakeFiles/edit_cache.dir
+C:/Development/RTOS/labs/lab04_priority_inversion/build/debug/CMakeFiles/rebuild_cache.dir

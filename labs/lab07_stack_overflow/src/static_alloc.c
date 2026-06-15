@@ -81,3 +81,17 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
     *ppxIdleTaskStackBuffer = xIdleTaskStack;
     *pulIdleTaskStackSize   = configMINIMAL_STACK_SIZE;
 }
+
+/* ── Timer task static memory ───────────────────────────────────────────── */
+
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
+                                     StackType_t  **ppxTimerTaskStackBuffer,
+                                     uint32_t      *pulTimerTaskStackSize)
+{
+    static StaticTask_t xTimerTaskTCB;
+    static StackType_t  xTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+
+    *ppxTimerTaskTCBBuffer   = &xTimerTaskTCB;
+    *ppxTimerTaskStackBuffer = xTimerTaskStack;
+    *pulTimerTaskStackSize   = configTIMER_TASK_STACK_DEPTH;
+}

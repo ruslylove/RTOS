@@ -140,7 +140,7 @@ In \file{aperiodic\_handler.c}, implement:
 void GPIO0_IRQHandler(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23);
+    GPIO_PinClearInterruptFlag(GPIO0, 23u);
     xSemaphoreGiveFromISR(xAperiodicSem, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -162,8 +162,8 @@ void vAperiodicHandlerTask(void *pv)
 
 \begin{lstlisting}[style=bashstyle]
 cd labs/lab03_aperiodic_server
-make
-make flash
+mingw32-make
+mingw32-make flash
 \end{lstlisting}
 
 Press the user button several times and observe the terminal. Each press should appear as
@@ -236,7 +236,7 @@ Wire the button ISR to enqueue a request instead of giving a semaphore
 void GPIO0_IRQHandler(void)
 {
     BaseType_t xHPTW = pdFALSE;
-    GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23);
+    GPIO_PinClearInterruptFlag(GPIO0, 23u);
     AperiodicRequest_t req = { .type = 1,
                                .timestamp = xTaskGetTickCountFromISR() };
     xQueueSendFromISR(xRequestQueue, &req, &xHPTW);
@@ -457,6 +457,27 @@ In the trace identify and annotate:
   \bottomrule
 \end{tabular}
 \renewcommand{\arraystretch}{1}
+
+% ── Implementation Notes ──────────────────────────────────────────────────────
+\section{Implementation Notes}
+
+\subsection{GPIO Interrupt Flag API (SDK v2.x)}
+
+The current NXP MCUXpresso SDK uses a per-pin API to clear GPIO interrupt flags.
+Use \api{GPIO\_PinClearInterruptFlag} instead of the old mask-based function:
+
+\begin{lstlisting}[style=cstyle]
+/* Correct -- current SDK (MCUXpresso SDK 2.x) */
+GPIO_PinClearInterruptFlag(GPIO0, 23u);   /* pin number, not bit mask */
+
+/* Old API -- removed from current SDK, will fail to link */
+/* GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23); */
+\end{lstlisting}
+
+The function prototype is declared in \file{fsl\_gpio.h}:
+\begin{lstlisting}[style=cstyle]
+void GPIO_PinClearInterruptFlag(GPIO_Type *base, uint32_t pin);
+\end{lstlisting}
 
 % ── Reference ─────────────────────────────────────────────────────────────────
 \section{Reference}

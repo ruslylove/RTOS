@@ -1,11 +1,13 @@
 TARGET   = lab08_ns
 
-SDK_ROOT   = /Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk
+# macOS: SDK_ROOT = /Users/rus/Development/NXP_project/SDK/mcuxsdk/mcuxsdk
+SDK_ROOT   ?= C:/nxp_sdk/mcuxsdk/mcuxsdk
 SDK_DEVICE = $(SDK_ROOT)/devices/MCX/MCXN/MCXN236
 SDK_BOARD  = $(SDK_ROOT)/examples/_boards/frdmmcxn236
 SDK_HELLO  = $(SDK_BOARD)/freertos_examples/freertos_hello
 
-TOOLCHAIN ?= /opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin
+# macOS: TOOLCHAIN = /opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin
+TOOLCHAIN ?= C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin
 CC       = $(TOOLCHAIN)/arm-none-eabi-gcc
 OBJCOPY  = $(TOOLCHAIN)/arm-none-eabi-objcopy
 GDB      = $(TOOLCHAIN)/arm-none-eabi-gdb
@@ -22,6 +24,7 @@ DEFINES = \
     -DCPU_MCXN236VDF \
     -DMCXN236_SERIES \
     -D__STARTUP_CLEAR_BSS \
+    -D__START=main \
     -DDEBUG \
     -DSDK_DEBUGCONSOLE=1 \
     -DSDK_OS_FREE_RTOS
@@ -104,7 +107,7 @@ OBJS = $(SRCS:.c=.o)
 OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:.s=.o)
 
-PYOCD ?= /Users/rus/Development/RTOS/.venv/bin/pyocd
+PYOCD ?= C:/Development/RTOS/.venv/Scripts/pyocd.exe
 
 .PHONY: all clean flash debug setup
 
@@ -121,10 +124,10 @@ $(TARGET).bin: $(TARGET).elf
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.S
-	$(CC) $(CPU_FLAGS) $(OPT_FLAGS) $(DEFINES) -D__START=main -c $< -o $@
+	$(CC) $(CPU_FLAGS) $(OPT_FLAGS) $(DEFINES) -c $< -o $@
 
 %.o: %.s
-	$(CC) $(CPU_FLAGS) $(OPT_FLAGS) -c $< -o $@
+	$(CC) $(CPU_FLAGS) $(OPT_FLAGS) $(DEFINES) -c $< -o $@
 
 clean:
 	rm -f $(TARGET).elf $(TARGET).bin $(TARGET).map

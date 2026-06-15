@@ -15,6 +15,7 @@
 #include "task.h"
 #include "fsl_debug_console.h"
 #include "board.h"
+#include "app.h"
 #include "MCXN236.h"
 #include "ns_tasks.h"
 

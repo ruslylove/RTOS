@@ -1,0 +1,3 @@
+C:/Development/RTOS/labs/lab02_freertos_basics/build/debug/CMakeFiles/lab02.dir
+C:/Development/RTOS/labs/lab02_freertos_basics/build/debug/CMakeFiles/edit_cache.dir
+C:/Development/RTOS/labs/lab02_freertos_basics/build/debug/CMakeFiles/rebuild_cache.dir

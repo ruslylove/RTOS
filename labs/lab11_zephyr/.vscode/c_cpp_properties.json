@@ -1,0 +1,23 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Zephyr (ARM GCC)",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/build/zephyr/include/generated",
+        "${env:ZEPHYR_BASE}/include",
+        "${env:ZEPHYR_BASE}/kernel/include",
+        "${env:ZEPHYR_BASE}/arch/arm/include",
+        "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/arm-none-eabi/include"
+      ],
+      "defines": [
+        "CONFIG_ARM=1"
+      ],
+      "compilerPath": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin/arm-none-eabi-gcc.exe",
+      "cStandard": "c11",
+      "cppStandard": "c++14",
+      "intelliSenseMode": "gcc-arm"
+    }
+  ]
+}

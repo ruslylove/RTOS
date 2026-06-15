@@ -28,6 +28,7 @@
 
 #include "FreeRTOSConfig.h"
 #include "board.h"
+#include "app.h"
 #include "fsl_debug_console.h"
 #include "overflow_demo.h"
 #include "stack_sizing.h"

@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "West: build",
+      "type": "shell",
+      "command": "west build -b frdm_mcxn236",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "West: build (pristine)",
+      "type": "shell",
+      "command": "west build -b frdm_mcxn236 --pristine",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "West: flash",
+      "type": "shell",
+      "command": "west flash",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "West: build + flash",
+      "type": "shell",
+      "command": "west build -b frdm_mcxn236 && west flash",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "West: clean",
+      "type": "shell",
+      "command": "Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

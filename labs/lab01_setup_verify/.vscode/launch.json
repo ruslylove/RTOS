@@ -1,0 +1,44 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (pyocd + Cortex-Debug)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "pyocd",
+            "pyocdPath": "C:/Development/RTOS/.venv/Scripts/pyocd.exe",
+            "targetId": "mcxn236vdf",
+            "executable": "${workspaceFolder}/build/debug/lab01.elf",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none",
+            "preLaunchTask": "Build",
+            "svdFile": ""
+        },
+        {
+          "type": "mcuxpresso-debug",
+          "name": "Debug",
+          "request": "launch",
+          "cwd": "${workspaceFolder}",
+          "executable": {
+            "elf": ""
+          },
+          "stopAtSymbol": "main",
+          "probeSerialNumber": "",
+          "isAttach": false,
+          "skipBuildBeforeDebug": false,
+          "gdbInitCommands": [
+            "set remotetimeout 600",
+            "set debug-file-directory",
+            "set non-stop off"
+          ],
+          "gdbServerConfigs": {
+            "linkserver": {
+              "device": "MCXN236:FRDM-MCXN236"
+            },
+            "segger": {},
+            "pemicro": {}
+          },
+          "showDevDebugOutput": "none"
+        }
+    ]
+}

@@ -48,7 +48,7 @@ void GPIO0_IRQHandler(void)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     /* Clear the interrupt flag for pin 23 */
-    GPIO_ClearPinsInterruptFlags(GPIO0, 1u << 23);
+    GPIO_PinClearInterruptFlag(GPIO0, 23u);
 
 #if LAB_PART == DEFERRED_ISR
     /* Part A: signal the handler task via binary semaphore */

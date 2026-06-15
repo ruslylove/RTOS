@@ -1,0 +1,397 @@
+\documentclass[11pt, a4paper]{article}
+\input{../preamble}
+
+% ── Header / Footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{kmutnbBlue}\textbf{KMUTNB -- Faculty of Engineering}}
+\fancyhead[R]{\small\color{kmutnbBlue}Dept.\ of Electrical and Computer Engineering}
+\fancyfoot[L]{\small\color{kmutnbBlue}Real-Time Operating Systems -- M.Eng.\ ECE}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small\color{kmutnbBlue}Lab 09}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{kmutnbGold}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{midGray}\leaders\hrule height\footrulewidth\hfill}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = kmutnbBlue,
+  urlcolor   = kmutnbBlue,
+  citecolor  = kmutnbBlue,
+  pdftitle   = {Lab 09 -- Producer-Consumer IPC with FreeRTOS Queue},
+  pdfauthor  = {KMUTNB RTOS Course},
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\labtitle{09}{Producer-Consumer IPC with FreeRTOS Queue}{4--5}{CLO 5 \& CLO 6}
+
+% ── Objectives ────────────────────────────────────────────────────────────────
+\section{Objectives}
+
+By completing this lab you will be able to:
+
+\begin{enumerate}[noitemsep, leftmargin=*]
+  \item \textbf{Implement} a high-rate producer task that writes samples into a lock-free
+        ring buffer protected by \api{\_\_DMB()} memory barriers.
+  \item \textbf{Implement} a consumer task that drains the ring buffer and applies a
+        4-tap moving-average FIR filter to each sample.
+  \item \textbf{Use} a FreeRTOS queue as a lightweight IPC notification channel between
+        the producer and consumer.
+  \item \textbf{Measure} end-to-end IPC latency using DWT cycle timestamps.
+  \item \textbf{Understand} the design differences between FreeRTOS queue IPC and
+        hardware Messaging Unit (MU) IPC on true dual-core MCUs.
+\end{enumerate}
+
+\begin{warnbox}
+  \textbf{Single-core adaptation.}
+  The MCXN236 is a \emph{single-core} Cortex-M33 device (the ``N2'' in the part
+  number refers to the MCX N-series family, not core count). This lab implements
+  the same producer-consumer pattern and ring-buffer IPC concepts using
+  \textbf{FreeRTOS tasks and queues} on a single core. The theoretical
+  dual-core/MU content in the Background section shows how the design would extend
+  to a true dual-core device (e.g.\ MCXN947).
+\end{warnbox}
+
+% ── Prerequisites ─────────────────────────────────────────────────────────────
+\section{Prerequisites}
+
+\begin{checklist}
+  \item Lab 06 complete (DWT cycle counter working).
+  \item ARM GNU Toolchain 14.2 and \texttt{pyocd} working.
+  \item NXP MCUXpresso SDK at \texttt{C:/nxp\_sdk/mcuxsdk/mcuxsdk}.
+  \item Understanding of memory barriers (\api{\_\_DMB()}, \api{\_\_DSB()}).
+\end{checklist}
+
+% ── Background ────────────────────────────────────────────────────────────────
+\section{Background}
+
+\subsection{FreeRTOS Queue as IPC Notification}
+
+On a single-core MCU, tasks communicate through FreeRTOS primitives.
+This lab uses a \textbf{queue of depth 1} as a notification channel --- the producer
+sends a token when new samples are available; the consumer blocks on the queue:
+
+\begin{lstlisting}[style=cstyle]
+/* Producer sends notification */
+uint32_t token = 1;
+xQueueSend(g_notify_queue, &token, 0);   /* non-blocking; drop if full */
+
+/* Consumer blocks for notification */
+uint32_t dummy;
+xQueueReceive(g_notify_queue, &dummy, portMAX_DELAY);
+\end{lstlisting}
+
+\subsection{Ring Buffer with Memory Barriers}
+
+Even on a single core, \api{\_\_DMB()} is the correct idiom for lock-free ring
+buffers because it prevents the compiler and CPU pipeline from reordering
+the data store before the index update:
+
+\begin{lstlisting}[style=cstyle]
+g_ring.data[g_ring.write_idx] = sample;
+__DMB();                   /* data visible before index advance */
+g_ring.write_idx = next;
+\end{lstlisting}
+
+\subsection{Conceptual Dual-Core Reference (MCXN947 / True AMP)}
+
+On a true dual-core device the IPC would use the Messaging Unit (MU) hardware
+instead of a FreeRTOS queue, and the ring buffer would live in shared SRAM:
+
+\begin{lstlisting}[style=cstyle]
+/* Producer -- on CM33_0 (dual-core device only) */
+g_ring.data[g_ring.write_idx] = sample;
+__DMB();                        /* all stores visible before index update */
+g_ring.write_idx = next;
+__DMB();                        /* index visible before MU send */
+MU_SendMsg(MUA, 0, next);       /* hardware notification to CM33_1 */
+
+/* Consumer ISR -- on CM33_1 (dual-core device only) */
+uint32_t idx = MU_ReceiveMsg(MUB, 0);
+__DMB();                        /* MU read complete before we read shared buffer */
+process(g_ring.data[idx]);
+\end{lstlisting}
+
+The \api{\_\_DMB()} requirements are \emph{stricter} on a multi-core device because
+the memory model is weakly ordered across cores.
+
+% ── Project Structure ─────────────────────────────────────────────────────────
+\section{Project Structure}
+
+\begin{lstlisting}[style=textstyle]
+lab09_freertos_ipc/
+  cm33_0/                          <- Main (functional) firmware
+    Makefile
+    src/
+      main_cm33_0.c                <- hardware init, queue + task creation
+      adc_producer.c/.h            <- producer task (simulated ADC at 1 kHz)
+      fir_consumer.c/.h            <- consumer task (4-tap FIR filter)
+      shared_mem.h                 <- RingBuf_t, LatencyTest_t types
+      FreeRTOSConfig.h
+  cm33_1/                          <- Reference build (conceptual; links cleanly)
+    Makefile
+    src/
+      main_cm33_1.c                <- standalone reference entry point
+      fir_consumer.c/.h            <- same consumer logic
+      shared_mem.h
+\end{lstlisting}
+
+\begin{tipbox}
+  Only \file{cm33\_0/} is needed to run the lab on the FRDM-MCXN236.
+  \file{cm33\_1/} is a companion reference build to illustrate how the consumer
+  would be structured on a separate core.
+\end{tipbox}
+
+% ── Part A ─────────────────────────────────────────────────────────────────────
+\section{Part A --- Build and Flash}
+
+\subsection{Step 1 --- Build cm33\_0}
+
+\begin{lstlisting}[style=bashstyle]
+cd labs/lab09_freertos_ipc/cm33_0
+mingw32-make
+\end{lstlisting}
+
+Expected output:
+\begin{lstlisting}[style=textstyle]
+   text    data     bss     dec     hex filename
+  28896      20   69852   98768   181d0 lab09_cm33_0.elf
+\end{lstlisting}
+
+\subsection{Step 2 --- Flash}
+
+\begin{lstlisting}[style=bashstyle]
+mingw32-make flash
+\end{lstlisting}
+
+\subsection{Step 3 --- Expected UART Output}
+
+\begin{lstlisting}[style=textstyle]
+=== RTOS Lab 09: Dual-Core AMP (CM33_0) ===
+[CM33_0] starting scheduler -- free heap: 61440 bytes
+
+[CM33_1] consumed=1000, missed=0, free heap=62440
+[CM33_1] consumed=2000, missed=0, free heap=62440
+\end{lstlisting}
+
+\begin{checkpointbox}[~A]
+  UART showing non-zero consumed count and zero missed samples for at least 10 seconds.
+\end{checkpointbox}
+
+% ── Part B ─────────────────────────────────────────────────────────────────────
+\section{Part B --- Producer Task}
+
+The producer runs at 1\,kHz using \api{vTaskDelayUntil}. Examine
+\file{src/adc\_producer.c}:
+
+\begin{lstlisting}[style=cstyle]
+void vADCProducerTask(void *pvParameters)
+{
+    TickType_t xLastWake = xTaskGetTickCount();
+    uint32_t   sample_count = 0;
+
+    for (;;) {
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(1));  /* 1 kHz */
+
+        uint32_t next = (g_ring.write_idx + 1U) % RING_BUF_SIZE;
+        if (next == g_ring.read_idx) {
+            g_ring.missed++;
+            continue;               /* ring full -- drop sample */
+        }
+
+        g_ring.data[g_ring.write_idx] = (int16_t)(sample_count % 4096);
+        sample_count++;
+        __DMB();                    /* data store before index advance */
+        g_ring.write_idx = next;
+
+        /* Notify consumer every 16 samples */
+        if ((g_ring.write_idx & 0xFU) == 0U) {
+            uint32_t token = 1U;
+            xQueueSend(g_notify_queue, &token, 0);
+        }
+    }
+}
+\end{lstlisting}
+
+\begin{questionbox}[~B1]
+  Why does the producer call \api{xQueueSend} only every 16 samples rather than
+  every sample? What is the trade-off between notification frequency and latency?
+\end{questionbox}
+
+\begin{questionbox}[~B2]
+  The producer uses \api{xQueueSend} with timeout 0 (non-blocking). What happens
+  to a notification if the consumer has not yet read the previous one from the
+  queue? Is this safe for a ring-buffer IPC scheme? Why?
+\end{questionbox}
+
+% ── Part C ─────────────────────────────────────────────────────────────────────
+\section{Part C --- Consumer Task and FIR Filter}
+
+Examine \file{src/fir\_consumer.c}:
+
+\begin{lstlisting}[style=cstyle]
+void vFIRConsumerTask(void *pvParameters)
+{
+    uint32_t consumed   = 0;
+    TickType_t rep_tick = xTaskGetTickCount();
+
+    for (;;) {
+        uint32_t dummy;
+        xQueueReceive(g_notify_queue, &dummy, pdMS_TO_TICKS(100));
+
+        __DMB();     /* ensure latest write_idx is visible */
+
+        while (g_ring.read_idx != g_ring.write_idx) {
+            int16_t raw      = g_ring.data[g_ring.read_idx];
+            int32_t filtered = fir_filter(raw);     /* 4-tap moving average */
+            g_ring.read_idx  = (g_ring.read_idx + 1U) % RING_BUF_SIZE;
+            consumed++;
+            (void)filtered;
+        }
+
+        /* Report every 1 s */
+        if ((xTaskGetTickCount() - rep_tick) >= pdMS_TO_TICKS(1000)) {
+            rep_tick = xTaskGetTickCount();
+            PRINTF("[CM33_1] consumed=%lu  missed=%lu  heap=%u\r\n",
+                   (unsigned long)consumed,
+                   (unsigned long)g_ring.missed,
+                   (unsigned)xPortGetFreeHeapSize());
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{FIR Filter}
+
+The 4-tap moving-average filter in the consumer:
+
+\begin{lstlisting}[style=cstyle]
+static int32_t fir_filter(int16_t new_sample)
+{
+    static int16_t history[4] = {0};
+    static uint8_t idx = 0;
+
+    history[idx] = new_sample;
+    idx = (uint8_t)((idx + 1U) % 4U);
+
+    int32_t acc = 0;
+    for (uint8_t i = 0; i < 4; i++) acc += history[i];
+    return acc / 4;
+}
+\end{lstlisting}
+
+\begin{checkpointbox}[~C]
+  Modify \file{fir\_consumer.c} to \texttt{PRINTF} the running average every 1000
+  samples. Show terminal output with filtered values.
+\end{checkpointbox}
+
+\begin{questionbox}[~C1]
+  The ring buffer uses \texttt{volatile} on \texttt{write\_idx} and
+  \texttt{read\_idx}, \emph{and} also uses \api{\_\_DMB()}. What does
+  \texttt{volatile} prevent that \api{\_\_DMB()} does not? What does
+  \api{\_\_DMB()} prevent that \texttt{volatile} does not?
+\end{questionbox}
+
+% ── Part D ─────────────────────────────────────────────────────────────────────
+\section{Part D --- IPC Latency Measurement}
+
+Use the DWT cycle counter to measure the latency from when the producer writes the
+last sample in a batch to when the consumer first reads it. The \file{shared\_mem.h}
+already defines \texttt{LatencyTest\_t} for this:
+
+\begin{lstlisting}[style=cstyle]
+/* shared_mem.h */
+typedef struct {
+    volatile uint32_t send_cycles;   /* producer records DWT->CYCCNT before notify */
+    volatile uint32_t recv_cycles;   /* consumer records DWT->CYCCNT on wake-up */
+} LatencyTest_t;
+
+extern LatencyTest_t g_latency;
+\end{lstlisting}
+
+Add the measurements:
+
+\begin{lstlisting}[style=cstyle]
+/* In vADCProducerTask -- just before xQueueSend */
+g_latency.send_cycles = DWT->CYCCNT;
+
+/* In vFIRConsumerTask -- first line after xQueueReceive returns */
+g_latency.recv_cycles = DWT->CYCCNT;
+\end{lstlisting}
+
+Then print the latency in the consumer's periodic report:
+
+\begin{lstlisting}[style=cstyle]
+uint32_t lat = g_latency.recv_cycles - g_latency.send_cycles;
+PRINTF("[LAT] %lu cycles (~%lu ns @ 150 MHz)\r\n",
+       (unsigned long)lat, (unsigned long)(lat * 1000UL / 150UL));
+\end{lstlisting}
+
+\begin{checkpointbox}[~D]
+  Terminal output showing measured IPC latency in cycles and nanoseconds.
+\end{checkpointbox}
+
+\begin{questionbox}[~D1]
+  On a true dual-core device, MU hardware latency is typically 50--200 cycles.
+  How does your FreeRTOS queue IPC latency compare? What accounts for the
+  difference (FreeRTOS context switch overhead, queue ISR path, etc.)?
+\end{questionbox}
+
+% ── Deliverables ───────────────────────────────────────────────────────────────
+\section{Deliverables}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} c p{5cm} p{6.5cm} @{}}
+  \toprule
+  \textbf{\#} & \textbf{Item} & \textbf{Details} \\
+  \midrule
+  1 & Part A UART & Non-zero consumed, zero missed for 10\,s \\
+  2 & Part C UART & Running average printed every 1000 samples \\
+  3 & Part D UART & IPC latency in cycles and nanoseconds \\
+  4 & Written answers & Questions B1, B2, C1, D1 \\
+  5 & \file{shared\_mem.h} listing & Ring buffer + latency struct \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Key Concepts ───────────────────────────────────────────────────────────────
+\section{Key Concepts Demonstrated}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{6.5cm} p{6cm} @{}}
+  \toprule
+  \textbf{Concept} & \textbf{Where you saw it} \\
+  \midrule
+  Lock-free ring buffer with DMB barriers & Parts B \& C \\
+  FreeRTOS queue as IPC notification      & Parts B \& C \\
+  IPC latency measurement with DWT        & Part D \\
+  Producer notification batching          & Part B (Q\,B1) \\
+  \texttt{volatile} vs.\ \api{\_\_DMB()} & Part C (Q\,C1) \\
+  MU hardware IPC (conceptual reference)  & Background \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+% ── Reference ─────────────────────────────────────────────────────────────────
+\section{Reference}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{6cm} p{6.5cm} @{}}
+  \toprule
+  \textbf{Resource} & \textbf{Relevant sections} \\
+  \midrule
+  ARM Cortex-M33 TRM & \S A3.4 Memory ordering, DMB instruction \\
+  Barry, \textit{Mastering the FreeRTOS Kernel} &
+    Ch.~9 (task notifications), \api{xQueueSend}, \api{xQueueReceive} \\
+  NXP MCUXpresso SDK & \file{fsl\_mu.h} (for dual-core reference) \\
+  NXP MCXN236 Data Sheet & \S 1 (single-core Cortex-M33 architecture) \\
+  \bottomrule
+\end{tabular}
+\renewcommand{\arraystretch}{1}
+
+\end{document}

@@ -191,7 +191,7 @@
 \begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
   \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
   \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
-  \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+  \textbf{Toolchain}      & ARM GNU Toolchain 14.2 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
   \textbf{Flash / Debug}  & pyocd 0.44 via local \texttt{.venv} (target \texttt{mcxn236vdf}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
   \textbf{CLO mapping}    & CLO\,3 (FreeRTOS implementation) \enspace CLO\,4 (synchronisation) \\
@@ -224,10 +224,10 @@ By completing this lab you will be able to:
 You must have completed \textbf{Lab 01} before starting:
 
 \begin{checklist}
-  \item ARM GNU Toolchain 12 installed; \texttt{make} succeeds in
+  \item ARM GNU Toolchain 14.2 installed; \texttt{make} succeeds in
         \file{lab01\_setup\_verify/}
   \item NXP MCUXpresso SDK at the path set in \texttt{SDK\_ROOT} in \file{Makefile}
-  \item \textbf{pyocd} available: \texttt{/Users/rus/Development/RTOS/.venv/bin/pyocd}
+  \item \textbf{pyocd} available: \texttt{C:/Development/RTOS/.venv/Scripts/pyocd.exe}
         (local venv; \texttt{NXP.MCXN236\_DFP} pack pre-installed)
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
   \item Python~3 + \texttt{pyserial} for serial monitoring
@@ -303,7 +303,7 @@ Three tasks and one software timer cooperate through shared kernel objects:
 
 \begin{lstlisting}[style=bashstyle]
 cd labs/lab02_freertos_basics
-make
+mingw32-make
 \end{lstlisting}
 
 Expected output (sizes will vary slightly):
@@ -328,7 +328,7 @@ arm-none-eabi-objcopy -O binary lab02.elf lab02.bin
 Connect the board via the MCU-LINK USB port, then:
 
 \begin{lstlisting}[style=bashstyle]
-make flash
+mingw32-make flash
 \end{lstlisting}
 
 This uses pyocd to erase, program, and reset the MCU.
@@ -340,8 +340,8 @@ The progress bar completes and the board starts running immediately after the re
 Find the serial port and open a terminal:
 
 \begin{lstlisting}[style=bashstyle]
-ls /dev/cu.usbmodem*          # find the port
-screen /dev/cu.usbmodemXXXXXX 115200
+# Windows: check Device Manager for COMx port          # find the port
+screen COMx 115200
 # Press Ctrl-A then Ctrl-\ to quit
 \end{lstlisting}
 
@@ -350,7 +350,7 @@ screen /dev/cu.usbmodemXXXXXX 115200
 \begin{lstlisting}[style=bashstyle]
 python3 -c "
 import serial, time, sys
-s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s = serial.Serial('COMx', 115200, timeout=0.1)
 s.reset_input_buffer()
 end = time.time() + 10
 while time.time() < end:

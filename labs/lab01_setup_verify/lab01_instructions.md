@@ -22,11 +22,11 @@ By completing this lab you will be able to:
 
 Before starting, confirm these are in place:
 
-- [ ] ARM GNU Toolchain 12 installed: `arm-none-eabi-gcc` available at  
-  `/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin` (or update `TOOLCHAIN` in `Makefile`)
+- [ ] ARM GNU Toolchain 14.2 installed: `arm-none-eabi-gcc` available at  
+  `C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin` (or update `TOOLCHAIN` in `Makefile`)
 - [ ] NXP MCUXpresso SDK extracted at  
-  `/Users/<you>/Development/NXP_project/SDK/mcuxsdk/mcuxsdk` (update `SDK_ROOT` in `Makefile` if different)
-- [ ] **pyocd** available: `/Users/rus/Development/RTOS/.venv/bin/pyocd` (local venv, `NXP.MCXN236_DFP` pack installed)
+  `C:/nxp_sdk/mcuxsdk/mcuxsdk` (update `SDK_ROOT` in `Makefile` if different)
+- [ ] **pyocd** available: `C:/Development/RTOS/.venv/Scripts/pyocd.exe` (local venv, `NXP.MCXN236_DFP` pack installed)
 - [ ] FRDM-MCXN236 board connected via the **MCU-LINK USB** port
 - [ ] Python 3 + `pyserial` for serial monitoring (`pip3 install pyserial`)
 
@@ -113,13 +113,13 @@ The board exposes a USB-CDC virtual COM port over the MCU-LINK USB cable.
 
 **Find the port:**
 ```bash
-ls /dev/cu.usbmodem*
-# Example: /dev/cu.usbmodemLBAZMNNVFKEDG3
+# Windows: check Device Manager for COMx port
+# Example: COM3
 ```
 
 **Monitor with screen:**
 ```bash
-screen /dev/cu.usbmodemXXXXXX 115200
+# Windows: use PuTTY or Tera Term (COMx, 115200 baud)
 # Press Ctrl-A then Ctrl-\ to quit screen
 ```
 
@@ -127,7 +127,7 @@ screen /dev/cu.usbmodemXXXXXX 115200
 ```python
 python3 -c "
 import serial, time, sys
-s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s = serial.Serial('COMx', 115200, timeout=0.1)
 s.reset_input_buffer()
 end = time.time() + 10
 while time.time() < end:

@@ -23,9 +23,9 @@ By completing this lab you will be able to:
 
 You must have completed **Lab 01** before starting:
 
-- [ ] ARM GNU Toolchain 12 installed; `make` succeeds in `lab01_setup_verify/`
+- [ ] ARM GNU Toolchain 14.2 installed; `make` succeeds in `lab01_setup_verify/`
 - [ ] NXP MCUXpresso SDK at the path set in `SDK_ROOT` in `Makefile`
-- [ ] **pyocd** available: `/Users/rus/Development/RTOS/.venv/bin/pyocd` (local venv, `NXP.MCXN236_DFP` pack installed)
+- [ ] **pyocd** available: `C:/Development/RTOS/.venv/Scripts/pyocd.exe` (local venv, `NXP.MCXN236_DFP` pack installed)
 - [ ] FRDM-MCXN236 connected via the **MCU-LINK USB** port
 - [ ] Python 3 + `pyserial` for serial monitoring (`pip3 install pyserial`)
 
@@ -115,8 +115,8 @@ Look for the progress bar completing — the board starts executing immediately 
 Find the serial port and open a terminal:
 
 ```bash
-ls /dev/cu.usbmodem*          # find the port
-screen /dev/cu.usbmodemXXXXXX 115200
+# Windows: check Device Manager for COMx port          # find the port
+# Windows: use PuTTY or Tera Term (COMx, 115200 baud)
 # Press Ctrl-A then Ctrl-\ to quit
 ```
 
@@ -125,7 +125,7 @@ screen /dev/cu.usbmodemXXXXXX 115200
 ```python
 python3 -c "
 import serial, time, sys
-s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s = serial.Serial('COMx', 115200, timeout=0.1)
 s.reset_input_buffer()
 end = time.time() + 10
 while time.time() < end:

@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (pyocd + Cortex-Debug)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "pyocd",
+      "pyocdPath": "C:/Development/RTOS/.venv/Scripts/pyocd.exe",
+      "targetId": "mcxn236vdf",
+      "executable": "${workspaceFolder}/build/debug/lab03.elf",
+      "runToEntryPoint": "main",
+      "showDevDebugOutput": "none",
+      "preLaunchTask": "CMake: build",
+      "svdFile": ""
+    }
+  ]
+}

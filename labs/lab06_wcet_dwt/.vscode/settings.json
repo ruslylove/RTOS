@@ -1,0 +1,17 @@
+{
+  "cmake.configureOnOpen": false,
+  "cmake.cmakePath": "C:/Users/rusle/.mcuxpressotools/cmake-3.30.0-windows-x86_64/bin/cmake.exe",
+  "cmake.configurePreset": "debug",
+  "cmake.buildPreset": "debug",
+  "cmake.useCMakePresets": "always",
+  "cmake.buildTask": true,
+  "cmake.skipConfigureIfCachePresent": false,
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.allowUnsupportedPresetsVersions": true,
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.files.exclude": { "**/.vscode": true, "**/__repo__": true },
+  "C_Cpp.exclusionPolicy": "checkFolders",
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "cortex-debug.armToolchainPath": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin",
+  "cortex-debug.pyocdPath": "C:/Development/RTOS/.venv/Scripts/pyocd.exe"
+}

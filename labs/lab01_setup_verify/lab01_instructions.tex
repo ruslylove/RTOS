@@ -192,7 +192,7 @@
 \begin{tabular}{@{}p{3.8cm} p{10cm}@{}}
   \textbf{Platform}       & NXP FRDM-MCXN236 (ARM Cortex-M33 @ 150\,MHz PLL) \\[2pt]
   \textbf{RTOS}           & FreeRTOS via NXP MCUXpresso SDK (\texttt{freertos-kernel-upstream}) \\[2pt]
-  \textbf{Toolchain}      & ARM GNU Toolchain 12 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
+  \textbf{Toolchain}      & ARM GNU Toolchain 14.2 (\texttt{arm-none-eabi-gcc}) + Make \\[2pt]
   \textbf{Flash / Debug}  & pyocd 0.44 via local \texttt{.venv} (target \texttt{mcxn236vdf}) \\[2pt]
   \textbf{Estimated time} & 2--3 hours \\[2pt]
   \textbf{CLO mapping}    & CLO\,1 (foundations) \enspace CLO\,3 (FreeRTOS implementation) \\
@@ -220,11 +220,11 @@ By completing this lab you will be able to:
 Before starting, confirm these are in place:
 
 \begin{checklist}
-  \item ARM GNU Toolchain 12 installed; \texttt{arm-none-eabi-gcc} available at\\
-        \texttt{/opt/homebrew/Cellar/arm-gcc-bin@12/12.2.Rel1/bin}\\
+  \item ARM GNU Toolchain 14.2 installed; \texttt{arm-none-eabi-gcc} available at\\
+        \texttt{C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86\_64-arm-none-eabi/bin}\\
         (or update \texttt{TOOLCHAIN} in \file{Makefile})
   \item NXP MCUXpresso SDK extracted; update \texttt{SDK\_ROOT} in \file{Makefile} if needed
-  \item \textbf{pyocd} available: \texttt{/Users/rus/Development/RTOS/.venv/bin/pyocd}
+  \item \textbf{pyocd} available: \texttt{C:/Development/RTOS/.venv/Scripts/pyocd.exe}
         (local venv; \texttt{NXP.MCXN236\_DFP} pack pre-installed)
   \item FRDM-MCXN236 connected via the \textbf{MCU-LINK USB} port
   \item Python~3 + \texttt{pyserial} for serial monitoring (\texttt{pip3 install pyserial})
@@ -283,7 +283,7 @@ A shared \textbf{UART mutex} (\api{xUartMutex}) prevents both tasks from calling
 
 \begin{lstlisting}[style=bashstyle]
 cd labs/lab01_setup_verify
-make
+mingw32-make
 \end{lstlisting}
 
 Expected output (sizes will vary slightly):
@@ -310,7 +310,7 @@ arm-none-eabi-size lab01.elf
 Connect the board via the MCU-LINK USB port, then:
 
 \begin{lstlisting}[style=bashstyle]
-make flash
+mingw32-make flash
 \end{lstlisting}
 
 This uses pyocd to erase, program, and reset the MCU.
@@ -325,13 +325,13 @@ The board exposes a USB-CDC virtual COM port over the MCU-LINK USB cable.
 
 \textbf{Find the port:}
 \begin{lstlisting}[style=bashstyle]
-ls /dev/cu.usbmodem*
-# Example output: /dev/cu.usbmodemLBAZMNNVFKEDG3
+# Windows: check Device Manager for COMx port
+# Example output: COM3
 \end{lstlisting}
 
 \textbf{Monitor with screen:}
 \begin{lstlisting}[style=bashstyle]
-screen /dev/cu.usbmodemXXXXXX 115200
+screen COMx 115200
 # Press Ctrl-A then Ctrl-\ to quit
 \end{lstlisting}
 
@@ -339,7 +339,7 @@ screen /dev/cu.usbmodemXXXXXX 115200
 \begin{lstlisting}[style=bashstyle]
 python3 -c "
 import serial, time, sys
-s = serial.Serial('/dev/cu.usbmodemXXXXXX', 115200, timeout=0.1)
+s = serial.Serial('COMx', 115200, timeout=0.1)
 s.reset_input_buffer()
 end = time.time() + 10
 while time.time() < end:

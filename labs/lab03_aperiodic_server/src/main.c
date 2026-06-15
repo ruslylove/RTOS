@@ -29,6 +29,7 @@
 #include "FreeRTOSConfig.h"
 #include "fsl_debug_console.h"
 #include "board.h"
+#include "app.h"
 #include "periodic_tasks.h"
 #include "aperiodic_handler.h"
 #include "producer_consumer.h"

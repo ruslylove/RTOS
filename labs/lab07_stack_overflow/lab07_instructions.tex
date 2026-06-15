@@ -268,7 +268,7 @@ uart_printf("Heap minimum ever free:     %u bytes\r\n",
 Build with map output enabled:
 
 \begin{lstlisting}[style=bashstyle]
-make MAP=1
+mingw32-make MAP=1
 \end{lstlisting}
 
 Open \file{lab07.map} and locate the memory layout. Fill in this table:
@@ -349,6 +349,30 @@ Expected: free heap increases by approximately
   enabled. Why does the idle task require static allocation even if all your application
   tasks use dynamic allocation?
 \end{questionbox}
+
+\begin{warnbox}
+  \textbf{Timer task hook also required.}
+  When \texttt{configSUPPORT\_STATIC\_ALLOCATION = 1} \emph{and}
+  \texttt{configUSE\_TIMERS = 1} (the default in this lab's
+  \file{FreeRTOSConfig.h}), the FreeRTOS timer task also needs static memory.
+  You must define \textbf{both} hooks or the linker will fail with
+  \texttt{undefined reference to `vApplicationGetTimerTaskMemory'}:
+
+\begin{lstlisting}[style=cstyle]
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
+                                     StackType_t  **ppxTimerTaskStackBuffer,
+                                     uint32_t      *pulTimerTaskStackSize)
+{
+    static StaticTask_t xTimerTaskTCB;
+    static StackType_t  xTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+    *ppxTimerTaskTCBBuffer   = &xTimerTaskTCB;
+    *ppxTimerTaskStackBuffer = xTimerTaskStack;
+    *pulTimerTaskStackSize   = configTIMER_TASK_STACK_DEPTH;
+}
+\end{lstlisting}
+
+  Add this alongside \texttt{vApplicationGetIdleTaskMemory} in \file{static\_alloc.c}.
+\end{warnbox}
 
 % ── Deliverables ───────────────────────────────────────────────────────────────
 \section{Deliverables}

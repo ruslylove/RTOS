@@ -1,0 +1,52 @@
+{
+  "version": 7,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (ARM GCC)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug",
+      "toolchainFile": "${sourceDir}/armgcc_windows.cmake",
+      "environment": {
+        "ARMGCC_DIR": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TOOLCHAIN_EXT": ".exe"
+      },
+      "inherits": [
+        "debug-env"
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Release (ARM GCC)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "toolchainFile": "${sourceDir}/armgcc_windows.cmake",
+      "environment": {
+        "ARMGCC_DIR": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TOOLCHAIN_EXT": ".exe"
+      },
+      "inherits": [
+        "release-env"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "include": [
+    "mcux_include.json"
+  ]
+}

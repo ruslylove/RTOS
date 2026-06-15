@@ -233,7 +233,7 @@ void    Secure_ADC_Init(void);
 
 \begin{lstlisting}[style=bashstyle]
 cd secure
-make
+mingw32-make
 # Output: secure.elf  +  cmse_implib.o (NSC veneer import library)
 \end{lstlisting}
 
@@ -278,15 +278,25 @@ Build the NS image (links against \file{cmse\_implib.o}):
 
 \begin{lstlisting}[style=bashstyle]
 cd nonsecure
-make
+mingw32-make
 \end{lstlisting}
 
 \subsection{Step 4 --- Flash and Run}
 
+Flash the secure image first, then the non-secure image:
+
 \begin{lstlisting}[style=bashstyle]
-./flash_both.sh
-# Flashes secure.bin to 0x0000_0000, then nonsecure.bin to 0x0004_0000
+cd secure
+mingw32-make flash
+cd ../nonsecure
+mingw32-make flash
 \end{lstlisting}
+
+\begin{warnbox}
+  \textbf{Flash order matters.} The Secure image configures the SAU and releases
+  the NS core. Always flash \file{secure/} before \file{nonsecure/} or the NS
+  application will start without a valid SAU configuration.
+\end{warnbox}
 
 Expected UART output:
 
@@ -433,6 +443,23 @@ void vBenchmarkTask(void *pv)
   \bottomrule
 \end{tabular}
 \renewcommand{\arraystretch}{1}
+
+% ── Implementation Notes ──────────────────────────────────────────────────────
+\section{Implementation Notes}
+
+\subsection{Board Hardware Init Declaration (\texttt{app.h})}
+
+\api{BOARD\_InitHardware()} is declared in \file{app.h} (from the SDK's
+\file{freertos\_hello} example), \emph{not} in \file{hardware\_init.h}.
+Both the secure and non-secure \file{main} files must include it:
+
+\begin{lstlisting}[style=cstyle]
+#include "board.h"
+#include "app.h"      /* declares BOARD_InitHardware() */
+\end{lstlisting}
+
+Without this include the compiler emits:
+\texttt{error: implicit declaration of function `BOARD\_InitHardware'}.
 
 % ── Reference ─────────────────────────────────────────────────────────────────
 \section{Reference}

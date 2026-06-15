@@ -19,6 +19,7 @@
 #include "semphr.h"
 #include "fsl_debug_console.h"
 #include "board.h"
+#include "app.h"
 #include "inversion_tasks.h"
 
 /* ── Part selection ──────────────────────────────────────────────────────── */

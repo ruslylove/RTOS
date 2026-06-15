@@ -12,6 +12,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "board.h"
+#include "app.h"
 #include "fsl_debug_console.h"
 #include "dwt.h"
 #include "workload.h"
