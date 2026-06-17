@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Development/RTOS/stm32_labs/lab02_freertos_basics/build/Debug/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

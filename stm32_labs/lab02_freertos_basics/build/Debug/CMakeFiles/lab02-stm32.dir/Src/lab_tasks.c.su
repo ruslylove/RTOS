@@ -1,0 +1,4 @@
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/lab_tasks.c:21:6:vSensorTask	32	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/lab_tasks.c:43:6:vDisplayTask	32	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/lab_tasks.c:61:6:vStatusTask	32	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/lab_tasks.c:80:6:vStatusTimerCallback	24	static

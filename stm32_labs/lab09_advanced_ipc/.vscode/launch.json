@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "stlinkgdbtarget",
+            "request": "launch",
+            "name": "Debug (ST-Link)",
+            "cwd": "${workspaceFolder}",
+            "gdb": "C:/Users/rusle/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi/bin/arm-none-eabi-gdb.exe",
+            "deviceName": "STM32H503CBT6",
+            "deviceCore": "Cortex-M33",
+            "runEntry": "main",
+            "serverCubeProgPath": "C:/Users/rusle/AppData/Local/stm32cube/bundles/programmer/2.22.0+st.1/bin",
+            "imagesAndSymbols": [
+                {
+                    "imageFileName": "${workspaceFolder}/build/Debug/lab09-stm32.elf"
+                }
+            ]
+        }
+    ]
+}

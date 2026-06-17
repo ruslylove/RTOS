@@ -1,0 +1,3 @@
+C:/Development/RTOS/stm32_labs/lab01_setup_verify/build/Debug/CMakeFiles/lab01-stm32.dir
+C:/Development/RTOS/stm32_labs/lab01_setup_verify/build/Debug/CMakeFiles/edit_cache.dir
+C:/Development/RTOS/stm32_labs/lab01_setup_verify/build/Debug/CMakeFiles/rebuild_cache.dir

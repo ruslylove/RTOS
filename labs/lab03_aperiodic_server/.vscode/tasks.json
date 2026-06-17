@@ -2,36 +2,91 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "cmake", "label": "CMake: build", "command": "build",
-      "preset": "debug", "targets": ["all"],
-      "group": { "kind": "build", "isDefault": true },
-      "problemMatcher": ["$gcc"], "detail": "CMake template build task"
+      "type": "cmake",
+      "label": "CMake: build",
+      "command": "build",
+      "preset": "debug",
+      "targets": [
+        "all"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "CMake template build task"
     },
     {
-      "type": "cmake", "label": "CMake: clean", "command": "clean",
-      "preset": "debug", "problemMatcher": ["$gcc"], "detail": "CMake template clean task"
+      "type": "cmake",
+      "label": "CMake: clean",
+      "command": "clean",
+      "preset": "debug",
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "CMake template clean task"
     },
     {
-      "type": "cmake", "label": "CMake: configure", "command": "configure",
-      "preset": "debug", "problemMatcher": ["$gcc"], "detail": "CMake template configure task"
+      "type": "cmake",
+      "label": "CMake: configure",
+      "command": "configure",
+      "preset": "debug",
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "CMake template configure task"
     },
     {
-      "label": "Build", "type": "shell", "command": "mingw32-make", "args": [],
-      "options": { "cwd": "${workspaceFolder}" },
-      "group": { "kind": "build", "isDefault": true }, "problemMatcher": "$gcc"
+      "label": "Build",
+      "type": "shell",
+      "command": "mingw32-make",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$gcc"
     },
     {
-      "label": "Clean", "type": "shell", "command": "mingw32-make", "args": ["clean"],
-      "options": { "cwd": "${workspaceFolder}" }, "group": "build", "problemMatcher": []
+      "label": "Clean",
+      "type": "shell",
+      "command": "mingw32-make",
+      "args": [
+        "clean"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
     },
     {
-      "label": "Flash", "type": "shell", "command": "mingw32-make", "args": ["flash"],
-      "options": { "cwd": "${workspaceFolder}" }, "group": "build", "problemMatcher": []
+      "label": "Flash",
+      "type": "shell",
+      "command": "mingw32-make",
+      "args": [
+        "flash"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
     },
     {
-      "label": "Build + Flash", "type": "shell",
+      "label": "Build + Flash",
+      "type": "shell",
       "command": "mingw32-make && mingw32-make flash",
-      "options": { "cwd": "${workspaceFolder}" }, "group": "build", "problemMatcher": "$gcc"
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": "$gcc"
     }
   ]
 }

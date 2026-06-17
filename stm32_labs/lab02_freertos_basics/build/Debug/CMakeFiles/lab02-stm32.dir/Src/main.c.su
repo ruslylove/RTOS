@@ -1,0 +1,7 @@
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:29:5:main	24	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:58:6:vApplicationTickHook	8	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:59:6:vApplicationStackOverflowHook	16	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:61:6:vApplicationMallocFailedHook	8	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:64:5:__io_putchar	16	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:70:13:SystemClock_Config	120	static
+C:/Development/RTOS/stm32_labs/lab02_freertos_basics/Src/main.c:92:13:uart_init	48	static

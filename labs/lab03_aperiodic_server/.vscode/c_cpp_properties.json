@@ -40,6 +40,16 @@
       "cppStandard": "c++14",
       "intelliSenseMode": "gcc-arm",
       "configurationProvider": "ms-vscode.cmake-tools"
+    },
+    {
+      "name": "IntelliSense Configuration",
+      "compileCommands": [
+        "${workspaceFolder}/build/debug/compile_commands.json"
+      ],
+      "intelliSenseMode": "gcc-arm",
+      "browse": {
+        "limitSymbolsToIncludedHeaders": true
+      }
     }
   ]
 }

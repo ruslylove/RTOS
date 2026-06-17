@@ -1,0 +1,3 @@
+C:/Development/RTOS/labs/lab03_aperiodic_server/build/debug/CMakeFiles/lab03.dir
+C:/Development/RTOS/labs/lab03_aperiodic_server/build/debug/CMakeFiles/edit_cache.dir
+C:/Development/RTOS/labs/lab03_aperiodic_server/build/debug/CMakeFiles/rebuild_cache.dir
