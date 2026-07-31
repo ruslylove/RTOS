@@ -247,18 +247,31 @@ So $U > 1$ → infeasible for every algorithm.
 
 <div class="text-sm mt-2">
 
-Suppose the EDF schedule has a **deadline miss** at time $t^*$. Then there is an interval $[t_0, t^*]$ where the CPU was busy the entire time, yet still ran out of time.
+Suppose EDF has a **deadline miss** at time $t^*$. Look backward to $t_0$ (the start of the busy period running only jobs with deadline $d_i \le t^*$).
 
 The total demand in $[t_0, t^*]$ must exceed $t^* - t_0$.
 
-But each task can demand at most $\lfloor (t^* - t_0)/T_i \rfloor \cdot C_i \le U_i \cdot (t^* - t_0)$ in that window.
+Workload demand $W(t_0, t^*) = \sum \lfloor \frac{t^* - t_0}{T_i} \rfloor C_i \le U (t^* - t_0)$.
 
-Summing: demand $\le U \cdot (t^* - t_0) \le t^* - t_0$ — **contradiction**.
-
-So EDF has no deadline misses when $U \le 1$.
+If $U \le 1 \implies t^* - t_0 < W \le t^* - t_0$ — **contradiction**!
 
 </div>
 
+</div>
+
+---
+
+# EDF Sufficiency — Graphical Contradiction Proof
+
+<div class="flex justify-center mt-2">
+  <img src="./figures/edf_sufficiency.svg" class="h-90 max-w-3xl" />
+</div>
+
+<div class="mt-2 text-xs opacity-80 text-center max-w-3xl mx-auto">
+<b>Proof by contradiction:</b>
+
+If a deadline miss occurs at $t^*$, the busy period $[t_0, t^*]$ requires demand $W(t_0, t^*) > t^* - t_0$. 
+  However, for $U \le 1$, maximum demand $W \le U(t^* - t_0) \le t^* - t_0$, yielding the impossibility $(t^* - t_0 < t^* - t_0)$.
 </div>
 
 ---
@@ -298,24 +311,30 @@ Set B ($U = 0.908$) is easily scheduled by EDF — the utilization test passes i
 
 ---
 
-# Set B Under EDF
+# Set B Under EDF — RMS vs. EDF Comparison
 
-Task set: τ₁(C=2,T=5), τ₂(C=2,T=7), τ₃(C=2,T=9) — $U = 0.908$
+Task set: $\tau_1(C=2,T=5)$, $\tau_2(C=2,T=7)$, $\tau_3(C=2,T=9)$ — $U = 0.908$
 
-<div class="mt-4 grid grid-cols-2 gap-6 text-sm">
-
-<div class="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400">
-<div class="font-bold text-red-700 dark:text-red-300">RMS result (from Week 3)</div>
-<div class="mt-2">τ₃ worst-case response time = 10 ms &gt; deadline 9 ms. <b>Infeasible.</b></div>
+<div class="flex justify-center mt-1">
+  <img src="./figures/set_b_schedulability.svg" class="h-50 max-w-full" />
 </div>
 
-<div class="px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 border-2 border-green-400">
-<div class="font-bold text-green-700 dark:text-green-300">EDF result</div>
-<div class="mt-2">
+<div class="mt-2 grid grid-cols-2 gap-4 text-xs">
 
-$U = 0.908 \le 1$ → <b>Schedulable.</b> The utilization test is necessary and sufficient. Done.
+<div class="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-400">
+
+<div class="font-bold text-red-700 dark:text-red-300">RMS Verdict — Infeasible</div>
+
+$\tau_1, \tau_2$ fixed priorities preempt $\tau_3$ at $t=5,7$. Response time $R_3 = 10\text{ ms} > D_3=9\text{ ms}$ (Deadline Miss at $t=9$).
 
 </div>
+
+<div class="px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-400">
+
+<div class="font-bold text-green-700 dark:text-green-300">EDF Verdict — Schedulable ✓</div>
+
+At $t=5$, $d_3=9 < d_{1,2}=10 \implies$ EDF dynamic priority keeps $\tau_3$. All deadlines met since $U = 0.908 \le 1$.
+
 </div>
 
 </div>
@@ -455,9 +474,10 @@ $$ \text{dbf}(0, L) \;=\; \sum_{i=1}^{n} \max\!\left(0,\; \left\lfloor \frac{L -
 
 </div>
 
+
 ::right::
 
-<div class="mt-6 px-5 py-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-sm leading-relaxed">
+<div class="mt-4 px-5 py-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-sm leading-relaxed">
 
 ### Demand Bound Function (DBF)
 
@@ -474,6 +494,21 @@ In practice you only need to check $L$ at <b>scheduling points</b> — absolute 
 For implicit deadlines ($D_i = T_i$) the DBF simplifies back to $U \le 1$ — consistent with the earlier theorem.
 
 </div>
+
+</div>
+
+---
+
+# Demand Bound Function (DBF) — Staircase Curve
+
+<div class="flex justify-center mt-1">
+  <img src="./figures/demand_bound_function.svg" class="h-90 max-w-full" />
+</div>
+
+<div class="mt-2 text-xs opacity-80 text-center max-w-3xl mx-auto">
+
+<b>Step-Function Behaviour:</b> $\text{dbf}_i(t)$ jumps by $+C_i$ at every job deadline $t = D_i + k \cdot T_i$. 
+EDF guarantees schedulability if and only if total workload demand $\sum \text{dbf}_i(t)$ remains on or below the CPU supply line ($y = t$).
 
 </div>
 
