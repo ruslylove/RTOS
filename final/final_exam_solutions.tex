@@ -1,0 +1,625 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+\documentclass[
+  11pt,
+]{article}
+\usepackage{xcolor}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Palatino}
+  \setmonofont[Scale=0.82]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\usepackage{caption}
+\captionsetup[table]{skip=6pt}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{booktabs}\usepackage{longtable}\usepackage{fvextra}\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}\newfontfamily\symfont{Arial Unicode MS}\usepackage{newunicodechar}\newunicodechar{→}{{\symfont →}}\newunicodechar{⇔}{{\symfont ⇔}}\newunicodechar{✓}{{\symfont ✓}}\newunicodechar{✗}{{\symfont ✗}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+% fallback for those not using the hyperref driver hyperxmp:
+\makeatletter
+\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
+\makeatother
+\hypersetup{
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\section{Final Examination --- Solutions and Marking
+Scheme}\label{final-examination-solutions-and-marking-scheme}
+
+\textbf{Course 010135311 --- Real-Time Operating Systems · Semester
+1/2026}
+
+\textbf{Instructor copy --- do not distribute with the exam paper.} All
+numeric answers were verified with a script (RTA iterations, EDF
+simulation, bounds).
+
+Marking principle: method marks are awarded even when the final value is
+wrong due to an arithmetic slip, provided the method is correct and the
+answer is consistent with it (carried-forward error counts once).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part A (12 pts)}\label{part-a-12-pts}
+
+\textbf{A1 (0.5 pt each).} a. \textbf{Hard} --- a miss is a safety
+hazard. b. \textbf{Firm} --- a late frame has no value and is discarded;
+no catastrophe. c.~\textbf{Soft} --- a late update only degrades
+quality. d.~\textbf{Firm} --- result worthless after the deadline, but
+no harm (zero utility after \(d\), no negative utility).
+
+\textbf{A2.} a. (1 pt) Real-time is about \textbf{guaranteed worst-case
+timing / meeting deadlines}, not average speed or clock frequency. An
+average of 2 µs says nothing about the worst case or jitter.
+(``Real-time ≠ fast.'') b. (1 pt, any two, 0.5 each)
+Bounded/deterministic context-switch time; deterministic (O(1) or
+bounded) kernel services; priority-based preemptive scheduler; precise
+tick/high-resolution timers; no demand paging / small footprint.
+
+\textbf{A3.} (2 pts) - Periodic: released exactly every \(T_i\). (0.5) -
+Sporadic: irregular but with a guaranteed \textbf{minimum} inter-arrival
+time \(a_i\). (0.5) - Aperiodic: irregular, \textbf{no} lower bound on
+inter-arrival time. (0.5) - \textbf{Sporadic} can carry a hard deadline
+and needs no server: the minimum gap bounds its CPU demand, so it can be
+analysed as a periodic task with \(T = a_i\). Aperiodic bursts have
+unbounded demand. (0.5)
+
+\textbf{A4.} (1 pt each: 0.5 verdict + 0.5 reason) a. \textbf{False.}
+RMS is optimal only \emph{within the fixed-priority class}. EDF (dynamic
+priority) schedules anything with \(U \le 1\) (implicit deadlines),
+including sets RMS cannot. b. \textbf{False.} Worst case occurs when
+\(\tau_i\) is released together with every \textbf{higher}-priority task
+(maximum interference). Lower-priority tasks do not interfere.
+
+\textbf{A5.} (i) \(U = 0.75 \le 0.7798\) → \textbf{schedulable} (0.5).
+(ii) \(U = 0.80 > U_{\text{lub}}(4) = 0.7568\), \(\le 1\) →
+\textbf{inconclusive} (1; needs RTA). (iii) \(U = 1.05 > 1\) →
+\textbf{infeasible} (0.5).
+
+\textbf{A6.} (2 pts: 0.5 each for three differences; 0.5 for the choice)
+Mutex has \textbf{ownership} (only the taker may give); mutex implements
+\textbf{priority inheritance}; mutex \textbf{cannot be used from an
+ISR}; mutex is created \emph{available} (binary semaphore is created
+empty); recursive variant exists. Use a \textbf{mutex} for the shared
+I²C bus (mutual exclusion). Priority inheritance is mentioned by the
+Week 6 slides; the details are Week 7 and are not required.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part B (12 pts)}\label{part-b-12-pts}
+
+\textbf{B1.} a. \(d = r + D = 6 + 10 = 16\) ms; response time
+\(f - r = 19 - 6 = 13\) ms. (1) b. Lateness \(= f - d = 3\) ms;
+tardiness \(= \max(0, 3) = 3\) ms. (1) c.~Laxity at release
+\(= D - C = 6\) ms. At \(t = 9\):
+\(d - t - C_{\text{rem}} = 16 - 9 - 4 = 3\) ms. (1) d.~\(f = 12\):
+lateness \(= 12 - 16 = -4\) ms; tardiness \(= 0\). Negative lateness =
+finished early (useful slack); tardiness is clamped at 0 because
+finishing early is not a cost, and it is the quantity that measures harm
+from a miss. (1)
+
+\textbf{B2.} a. \(r_{j} = \Phi + (j-1)T\): releases 3, 13, 23; absolute
+deadlines \(r + D\): 10, 20, 30. (1) b. \(D = 7 < T = 10\) →
+\textbf{constrained} deadline. \textbf{Deadline Monotonic (DMS)}, not
+RMS. (1) c.~\(H = \operatorname{lcm}(6, 10, 15) = 30\) ms (1). Jobs:
+\(30/6 = 5\), \(30/10 = 3\), \(30/15 = 2\) (1).
+
+\textbf{B3.} a. (1.5) Period \(\approx 10 + 3 = 13\) ms:
+\texttt{vTaskDelay} delays \textbf{n ticks from the call}, not from the
+previous release. Any preemption lengthens the cycle further, so the
+error \textbf{accumulates (drift)} and the timing has no fixed phase. b.
+(1.5)
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{TickType\_t xLastWake }\OperatorTok{=}\NormalTok{ xTaskGetTickCount}\OperatorTok{();}
+\ControlFlowTok{for} \OperatorTok{(;;)} \OperatorTok{\{}
+\NormalTok{    ReadSensorAndCompute}\OperatorTok{();}
+\NormalTok{    vTaskDelayUntil}\OperatorTok{(\&}\NormalTok{xLastWake}\OperatorTok{,}\NormalTok{ pdMS\_TO\_TICKS}\OperatorTok{(}\DecValTok{10}\OperatorTok{));}
+\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+(1 pt for \texttt{vTaskDelayUntil} with a persistent \texttt{xLastWake};
+0.5 for initialising before the loop.) c.~(1) Yes.
+\texttt{vTaskDelayUntil} fixes \textbf{release} times (no drift), but a
+higher-priority task or ISR can still delay when the job
+\textbf{starts/finishes}. That shows up as \textbf{response time}
+\(R_i > C_i\) (and release jitter if the release itself is delayed by
+interrupt handling). The analysis must show \(R_i \le D_i\) --- this is
+what RTA computes.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part C (14 pts)}\label{part-c-14-pts}
+
+\textbf{C1.} (3) Periods 4 \textless{} 6 \textless{} 12 → priorities
+\(\tau_1 > \tau_2 > \tau_3\) (shorter period = higher).
+\(U = \tfrac14 + \tfrac26 + \tfrac3{12} = 0.25 + 0.333 + 0.25 = 0.8333\).
+\(U_{\text{lub}}(3) = 0.7798\). \(0.7798 < 0.8333 \le 1\) →
+\textbf{inconclusive}; use RTA. (1 for priorities, 1 for \(U\), 1 for
+the verdict.)
+
+\textbf{C2.} (6) - \(R_1 = C_1 = 1 \le 4\) ✓ (1) - \(R_2\):
+\(R^{(0)} = 2\); \(R^{(1)} = 2 + \lceil 2/4 \rceil \cdot 1 = 3\);
+\(R^{(2)} = 2 + \lceil 3/4 \rceil \cdot 1 = 3\) ✓ → \(R_2 = 3 \le 6\)
+(2) - \(R_3\):
+\(3 \to 3 + 1\cdot1 + 1\cdot2 = 6 \to 3 + 2\cdot1 + 1\cdot2 = 7 \to 3 + 2\cdot1 + 2\cdot2 = 9 \to 3 + 3\cdot1 + 2\cdot2 = 10 \to 3 + 3\cdot1 + 2\cdot2 = 10\)
+✓ → \(R_3 = 10 \le 12\) (3: 2 for iterations, 1 for conclusion) -
+\textbf{Set P is schedulable.}
+
+\textbf{C3.} (3) Chart (all releases at 0, 4, 8 for \(\tau_1\); 0, 6, 12
+for \(\tau_2\); 0, 12 for \(\tau_3\)):
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Interval & Task & Note \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{[}0,1{]} & \(\tau_1\) & \\
+{[}1,3{]} & \(\tau_2\) & \\
+{[}3,4{]} & \(\tau_3\) & 1 of 3 units done \\
+{[}4,5{]} & \(\tau_1\) & \textbf{preempts \(\tau_3\)} at \(t=4\) \\
+{[}5,6{]} & \(\tau_3\) & 2 of 3 done \\
+{[}6,8{]} & \(\tau_2\) & second job released at 6, \textbf{preempts
+\(\tau_3\)} \\
+{[}8,9{]} & \(\tau_1\) & \\
+{[}9,10{]} & \(\tau_3\) & \textbf{completes at 10} (= \(R_3\)) \\
+{[}10,12{]} & idle & \\
+\end{longtable}
+}
+
+Deadlines: \(\tau_1\) at 4, 8, 12; \(\tau_2\) at 6, 12; \(\tau_3\) at
+12. (1 for correct execution pattern, 1 for marking preemptions at 4 and
+6, 1 for matching \(R_3 = 10\), \(R_2 = 3\) and \(R_1 = 1\).)
+
+\textbf{C4.} (2) \(C_3 = 5\). RTA:
+\(5 \to 5 + 1 + 2 = 8 \to 5 + 2 + 4 = 11 \to 5 + 3 + 4 = 12 \to 5 + 3 + 4 = 12\)
+✓, \(R_3 = 12 = D_3\). With \(C_3 = 6\), \(U = 1.083 > 1\) → infeasible.
+(1.5 for 5 and RTA). The Liu \& Layland bound is \textbf{sufficient, not
+necessary}: with \(C_3 = 5\), \(U = 1.0\) and the set is still
+schedulable, far above the bound. (0.5)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part D (14 pts)}\label{part-d-14-pts}
+
+\textbf{D1.} (2)
+\(U = \tfrac26 + \tfrac28 + \tfrac5{12} = \tfrac{4+3+5}{12} = 1.000\).
+EDF theorem: \(U \le 1\) ⇔ schedulable (implicit deadlines) →
+\textbf{EDF schedules it} (1). RMS:
+\(U = 1 > U_{\text{lub}}(3) = 0.7798\) → test
+\textbf{fails/inconclusive}, cannot guarantee (1).
+
+\textbf{D2.} (3) Priorities \(\tau_1 > \tau_2 > \tau_3\). \(R_1 = 2\);
+\(R_2\): \(2 \to 2 + 1\cdot2 = 4 \to 4\) ✓ (\(\le 8\)). \(R_3\):
+\(5 \to 5 + 1\cdot2 + 1\cdot2 = 9 \to 5 + 2\cdot2 + 2\cdot2 = 13 > D_3 = 12\)
+→ \textbf{\(\tau_3\) misses its deadline; set Q is not schedulable under
+RMS.} (1 for \(R_1, R_2\); 1.5 for \(R_3\) iterations; 0.5 conclusion.)
+
+\textbf{D3.} (6) Hyperperiod \(H = \operatorname{lcm}(6, 8, 12) = 24\).
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Interval & Job & Abs. deadline \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+{[}0,2{]} & \(J_{1,1}\) & 6 \\
+{[}2,4{]} & \(J_{2,1}\) & 8 \\
+{[}4,6{]} & \(J_{3,1}\) & 12 \\
+{[}6,8{]} & \(J_{1,2}\) & 12 (tie with \(J_{3,1}\) → lower index) \\
+{[}8,11{]} & \(J_{3,1}\) (resumes) & 12 \\
+{[}11,13{]} & \(J_{2,2}\) & 16 \\
+{[}13,15{]} & \(J_{1,3}\) & 18 \\
+{[}15,16{]} & \(J_{3,2}\) & 24 \\
+{[}16,18{]} & \(J_{2,3}\) & 24 (tie → lower index; \textbf{preempts}
+\(J_{3,2}\)) \\
+{[}18,20{]} & \(J_{1,4}\) & 24 (tie → lower index) \\
+{[}20,24{]} & \(J_{3,2}\) (resumes) & 24 \\
+\end{longtable}
+}
+
+Completion times vs deadlines: \(J_{1,1}\) 2/6, \(J_{2,1}\) 4/8,
+\(J_{1,2}\) 8/12, \(J_{3,1}\) 11/12, \(J_{2,2}\) 13/16, \(J_{1,3}\)
+15/18, \(J_{2,3}\) 18/24, \(J_{1,4}\) 20/24, \(J_{3,2}\) 24/24 ---
+\textbf{all met, with zero idle time} (consistent with \(U = 1\)).
+Marking: 3 for a valid EDF schedule (priority = earliest absolute
+deadline), 1.5 for correct completion times, 1 for deadline check, 0.5
+for noting no idle / \(J_{3,2}\) finishes exactly at 24. Accept a
+different valid schedule if it follows EDF with a \emph{stated}
+tie-break; the completion times of \(J_{3,2}\) (24) and all
+deadline-meet statements must hold.
+
+\textbf{D4.} (3) a.
+\(U = \tfrac38 + \tfrac3{10} = 0.375 + 0.3 = 0.675 \le 1\), but for
+\(D_i < T_i\) the bound \(U \le 1\) is \textbf{necessary, not
+sufficient}; the DBF test is needed. (1) b.
+\(\text{dbf}(4) = \left(\lfloor 0/8 \rfloor + 1\right)\cdot 3 + 0 = 3 \le 4\)
+✓.
+\(\text{dbf}(5) = \left(\lfloor 1/8 \rfloor + 1\right)\cdot 3 + \left(\lfloor 0/10 \rfloor + 1\right)\cdot 3 = 3 + 3 = 6 > 5\)
+✗. (1) c.~\textbf{Not schedulable.} At \(t=0\) both jobs are released
+with deadlines 4 and 5; 6 ms of work must complete by \(t = 5\), but
+only 5 ms of CPU exist. (1)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part E (13 pts)}\label{part-e-13-pts}
+
+\textbf{E1.} (5) a. (2) A polling server behaves exactly as a periodic
+task \((C_s, T_s) = (1, 4)\).
+\(U = \tfrac14 + \tfrac15 + \tfrac2{10} = 0.25 + 0.20 + 0.20 = 0.65 \le U_{\text{lub}}(3) = 0.7798\)
+→ \textbf{schedulable}. b. (3) \(U_s = 0.25\), \(n = 2\):
+\(U_{\text{lub}} = 0.25 + 2\left[\left(\tfrac{2.25}{1.5}\right)^{1/2} - 1\right] = 0.25 + 2(1.2247 - 1) = 0.6995\).
+\(U = 0.65 \le 0.6995\) → \textbf{still guaranteed}. (2 for computation,
+0.5 for verdict.) \(U_{\text{lub}}(3)\) cannot be used because the DS
+can retain its budget and release \textbf{back-to-back} bursts (\(2C_s\)
+in a window shorter than \(T_s\)), so it is not equivalent to a periodic
+task. (0.5)
+
+\textbf{E2.} (3) a. Polling server: the request misses the poll at
+\(t=0\) (budget discarded), the next poll is \(t=4\), the server
+(highest priority) serves 1 ms and completes at \textbf{\(t = 5\)};
+response time \textbf{4 ms}. (1) b. Deferrable server: the budget was
+preserved; request arrives at \(t=1\); the server is highest priority
+and runs immediately, completing at \textbf{\(t = 2\)}; response
+\textbf{1 ms}. (1) c.~The sporadic server ties replenishment to
+consumption: budget spent at \(t\) returns at \(t + T_s\). Hence the
+server never demands more than \(C_s\) in any window of length \(T_s\)
+--- exactly the behaviour of a periodic task. No back-to-back burst, so
+the full Liu \& Layland bound holds. (1)
+
+\textbf{E3.} (5) a. (1) Treat it as a periodic task with \(T = a = 20\)
+(and \(C=2\), \(D=3\) unchanged). Worst case is arrival at the maximum
+rate; slower arrivals only reduce demand, so passing at \(T = a\)
+implies passing for any admissible pattern. b. (1) \(D < T\) for the
+alarm → \textbf{Deadline Monotonic}: \(\tau_2\) (\(D=3\)) \(>\)
+\(\tau_1\) (\(D=10\)) \(>\) \(\tau_3\) (\(D=20\)). c.~(2)
+\(R_2 = 2 \le 3\) ✓. \(R_1\):
+\(2 \to 2 + \lceil 2/20 \rceil\cdot 2 = 4 \to 4\) ✓ (\(\le 10\)).
+\(R_3\):
+\(3 \to 3 + \lceil 3/20 \rceil\cdot 2 + \lceil 3/10 \rceil\cdot 2 = 7 \to 3 + 2 + 2 = 7\)
+✓ (\(\le 20\)). \textbf{Schedulable.} d.~(1) Under RMS, \(\tau_1\)
+(\(T=10\)) outranks \(\tau_2\) (\(T=20\)):
+\(R_2 = 2 + \lceil R/10 \rceil \cdot 2\): \(2 \to 4 \to 4 > D_2 = 3\) →
+the alarm \textbf{misses its deadline}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part F (20 pts)}\label{part-f-20-pts}
+
+\textbf{F1.} (5) Any five of these six. 1 pt each: defect/failure (0.5)
++ fix (0.5).
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{ISR calls the task-level API with an infinite timeout.}
+  \texttt{xQueueSendToBack} must not be called from an ISR, and an ISR
+  must never block. Fix:
+  \texttt{xQueueSendToBackFromISR(xRxQueue,\ \&b,\ \&xWoken)} then
+  \texttt{portYIELD\_FROM\_ISR(xWoken)}; on a full queue drop/count the
+  byte rather than block.
+\item
+  \textbf{Missing \texttt{xSemaphoreGive} on the ESC (\texttt{continue})
+  path.} The mutex stays taken forever, so the heartbeat task can never
+  print and the logger itself blocks forever on its next \texttt{Take}.
+  Fix: give before \texttt{continue}, or restructure so one give ends
+  the loop body.
+\item
+  \textbf{Queue item-size mismatch.}
+  \texttt{xQueueCreate(8,\ sizeof(uint32\_t))} but items are
+  \texttt{uint8\_t}: the send copies 4 bytes from a 1-byte variable
+  (over-reads the stack), the receive writes 4 bytes into the 1-byte
+  \texttt{b} (stack corruption). Fix: \texttt{sizeof(uint8\_t)}.
+\item
+  \textbf{\texttt{xSemaphoreCreateBinary()} used as a mutex.} It is
+  created \textbf{empty}, so the first \texttt{xSemaphoreTake} blocks
+  forever (nobody gives). It also lacks ownership and priority
+  inheritance. Fix: \texttt{xSemaphoreCreateMutex()} (created available;
+  \texttt{configUSE\_MUTEXES\ =\ 1}).
+\item
+  \textbf{\texttt{vHeartbeatTask} prints without taking the mutex.} The
+  UART is a shared resource, so heartbeat and logger output can
+  interleave or corrupt the driver state. Fix: wrap \texttt{PRINTF} in
+  \texttt{Take}/\texttt{Give}.
+\item
+  \textbf{No NULL checks} on \texttt{xQueueCreate},
+  \texttt{xSemaphoreCreateMutex}, \texttt{xTaskCreate} (heap exhaustion
+  returns NULL/errors). Accept only as a fifth item if the other four
+  distinct defects are not all found.
+\end{enumerate}
+
+\textbf{F2.} (5) 0.5 for primitive, 0.5 for reason/API. a.
+\textbf{Binary semaphore} (or task notification):
+\texttt{xSemaphoreGiveFromISR} in the ISR, \texttt{xSemaphoreTake} in
+the task. Pure signalling. b. \textbf{Mutex}:
+\texttt{xSemaphoreCreateMutex}, \texttt{Take} \ldots{} \texttt{Give}
+around the I²C transaction. Exclusion with ownership; critical section
+too long to mask interrupts. c.~\textbf{Counting semaphore} created with
+max = initial = 4; \texttt{Take} to acquire a channel, \texttt{Give} to
+release. d.~\textbf{Queue} of depth ≥ 3 with
+\texttt{sizeof(SensorData\_t)}: copy by value, buffers bursts, blocking
+provides back-pressure. e. \textbf{Critical section}
+(\texttt{taskENTER\_CRITICAL} / \texttt{taskEXIT\_CRITICAL}, or the
+\texttt{FromISR} variant in the ISR): very short, and a mutex cannot be
+used from an ISR.
+
+\textbf{F3.} (5) Trace: at \(t=0\), P (higher priority) runs: sends 1 →
+queue {[}1{]}; sends 2 → {[}1,2{]}; send 3 blocks (queue full) → P
+blocked. C runs: \texttt{xQueueReceive} takes 1 → queue {[}2{]}; this
+unblocks P, which outranks C, so \textbf{P preempts C inside the receive
+call}; P sends 3 → {[}2,3{]}; send 4 blocks → P blocked again; C
+resumes, prints, and \texttt{vTaskDelay(10)}. At tick 10, C receives 2 →
+queue {[}3{]}; P unblocked, preempts, sends 4 → {[}3,4{]}, then
+\texttt{vTaskDelete}. C prints 2, and so on.
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\tightlist
+\item
+  (2) Output: \texttt{1\ @0}, \texttt{2\ @10}, \texttt{3\ @20},
+  \texttt{4\ @30} (0.5 each). After \texttt{4\ @30}, C blocks on the
+  empty queue at tick 40 indefinitely.
+\item
+  \begin{enumerate}
+  \def\labelenumii{(\arabic{enumii})}
+  \tightlist
+  \item
+    At tick 5: \textbf{{[}2, 3{]}}, full (head = 2).
+  \end{enumerate}
+\item
+  (2) P blocks at \(t=0\) on the third send (queue full) and again on
+  the fourth send; it unblocks at \(t = 0\) (when C removes 1) and at
+  \(t = 10\) (when C removes 2). C is preempted in its first
+  \texttt{xQueueReceive} because removing an item makes the
+  higher-priority blocked sender ready, and the kernel context-switches
+  on exit from the call.
+\end{enumerate}
+
+\textbf{F4.} (5) a. (2) Initial \texttt{gCounter\ ==\ 10}. Task A:
+\texttt{LDR\ r0} (r0 = 10) → \textbf{preempted after the LDR} → Task B:
+\texttt{LDR} (10), \texttt{ADD} (11), \texttt{STR} (gCounter = 11) →
+Task A resumes: \texttt{ADD\ r0,r0,\#1} (r0 = 11), \texttt{STR}
+(gCounter = 11). Final value \textbf{11} instead of 12: \textbf{one
+increment lost}. (1 for a valid interleaving, 1 for naming the
+preemption point between load and store.) b. (2) The task already
+\textbf{owns} the mutex and blocks on it a second time →
+\textbf{self-deadlock} (blocked forever with \texttt{portMAX\_DELAY}).
+Fixes (1 each, any two): (i) use a \textbf{recursive mutex}
+(\texttt{xSemaphoreCreateRecursiveMutex},
+\texttt{xSemaphoreTakeRecursive}/\texttt{GiveRecursive},
+\texttt{configUSE\_RECURSIVE\_MUTEXES\ =\ 1}; give the same number of
+times as taken); (ii) restructure: make an internal
+\texttt{vFormat\_locked()} that assumes the mutex is held, and have only
+the public entry take it; (iii) pass the lock-state / don't lock in the
+inner function. c.~(1) A mutex has \textbf{ownership}: the same task
+that took it must give it. An ISR has no task context, so ownership is
+undefined, and FreeRTOS provides no \texttt{FromISR} give for mutexes.
+ISR → task signalling is an event with no owner; a binary semaphore
+(\texttt{xSemaphoreGiveFromISR}) is ISR-safe and designed for this.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Part G (15 pts)}\label{part-g-15-pts}
+
+\textbf{G1.} (2) 0.4 each.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+Activity & Class & Deadline \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+E-stop handler & \textbf{sporadic} & \textbf{hard} \\
+Current loop & periodic & \textbf{hard} \\
+CLI & \textbf{aperiodic} & \textbf{soft} \\
+Speed loop & periodic & hard (accept firm) \\
+Logger & periodic & soft/firm (accept either with reason) \\
+\end{longtable}
+}
+
+\textbf{G2.} (3) Rule: \textbf{Deadline Monotonic} (equals RMS for the
+periodic tasks; the server is ranked by its period \(T_s\), the sporadic
+task by its \(D\)). Order, highest → lowest: 1. E-stop handler
+(\(D = 5\)) 2. Current loop (\(D = T = 5\)) 3. Polling server
+(\(T_s = 10\)) 4. Speed loop (\(T = D = 20\)) 5. Logger (\(T = D = 40\))
+
+(2 for the order, 1 for placing the E-stop above the current loop: equal
+deadlines, tie broken in favour of the \textbf{safety-critical, hard,
+sporadic} task --- also it has the smaller \(C\) and minimises
+worst-case latency to the e-stop action. Reverse order accepted if
+justified and the RTA is recomputed accordingly.)
+
+\textbf{G3.} (2)
+\(U = \tfrac1{50} + \tfrac15 + \tfrac2{10} + \tfrac2{20} + \tfrac4{40} = 0.02 + 0.20 + 0.20 + 0.10 + 0.10 = 0.62\).
+\(n = 5\) entities (server counted as periodic) →
+\(U_{\text{lub}}(5) = 0.7435\). \(0.62 \le 0.7435\) →
+\textbf{schedulable}; RTA is not strictly required. (1 for \(U\), 1 for
+the bound and conclusion.)
+
+\textbf{G4.} (5) Speed loop,
+\(\text{hp} = \{\text{E-stop}(1,50),\ \text{Cur}(1,5),\ \text{PS}(2,10)\}\):
+\(R^{(0)} = 2\); \(R^{(1)} = 2 + 1\cdot1 + 1\cdot1 + 1\cdot2 = 6\);
+\(R^{(2)} = 2 + 1 + \lceil 6/5 \rceil \cdot 1 + \lceil 6/10 \rceil \cdot 2 = 2 + 1 + 2 + 2 = 7\);
+\(R^{(3)} = 2 + 1 + \lceil 7/5 \rceil + \lceil 7/10 \rceil \cdot 2 = 2 + 1 + 2 + 2 = 7\)
+✓ → \textbf{\(R = 7 \le 20\)}. (2.5)
+
+Logger, \(\text{hp}\) adds Speed(2,20):
+\(R^{(0)} = 4 \to 4 + 1 + 1 + 2 + 2 = 10 \to 4 + 1 + 2 + 2 + 2 = 11 \to 4 + 1 + 3 + 4 + 2 = 14 \to 4 + 1 + 3 + 4 + 2 = 14\)
+✓ → \textbf{\(R = 14 \le 40\)}. (2.5)
+
+Both tasks are schedulable with wide margin.
+
+\textbf{G5.} (3) 1 pt each. a. \textbf{Binary semaphore} (or task
+notification): the GPIO ISR calls
+\texttt{xSemaphoreGiveFromISR(xEstopSem,\ \&xWoken)} (or
+\texttt{vTaskNotifyGiveFromISR}) followed by
+\texttt{portYIELD\_FROM\_ISR(xWoken)}; the E-stop handler task blocks in
+\texttt{xSemaphoreTake}/\texttt{ulTaskNotifyTake}. Signalling only, no
+data; ISR-safe. (Deferred-interrupt pattern from Week 5.) b.
+\textbf{Queue} of the result struct (copy by value): speed loop calls
+\texttt{xQueueSendToBack} (task API; timeout 0 or short so a full queue
+does not stall the 20 ms loop), logger calls \texttt{xQueueReceive}.
+Depth chosen for the worst burst; logger's lower priority makes
+buffering necessary. c.~\textbf{Mutex} (\texttt{xSemaphoreCreateMutex}):
+both logger and the CLI handler \texttt{Take} before and \texttt{Give}
+after each UART print; only task-level calls. (Notes: ISR never touches
+it; blocking time from this mutex is the next module's topic.)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Score distribution guide}\label{score-distribution-guide}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Range
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Interpretation
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+90--100 & Complete command of analysis and implementation \\
+75--89 & Solid; minor slips in RTA/EDF arithmetic or API details \\
+60--74 & Understands methods, weak on one part (typically D or F) \\
+\textless{} 60 & Needs to revisit schedulability analysis and/or
+synchronisation primitives \\
+\end{longtable}
+}
+
+\subsection{Design notes for the
+instructor}\label{design-notes-for-the-instructor}
+
+\begin{itemize}
+\tightlist
+\item
+  Open-book design: no pure recall; every part needs computation,
+  tracing, or diagnosis.
+\item
+  Scope: Weeks 1--5 + Week 6 through mutexes. Event groups (Week 6 Part
+  5), Lab 3 and priority-inversion protocols (Week 7) are
+  \textbf{excluded}; the DS bound formula, the \(U_{\text{lub}}\) table
+  and the RTA/dbf recurrences are printed on the paper.
+\item
+  Parts C and D deliberately reuse the Week 3--4 pedagogy with fresh
+  numbers: set P is amber-zone yet RMS-schedulable (RTA needs 5
+  iterations); set Q has \(U = 1\) and is EDF-schedulable but
+  RMS-infeasible.
+\item
+  E3 and D4 test the two ``trap'' lessons: sporadic with \(D < T\) needs
+  DMS; \(U \le 1\) is not sufficient for constrained deadlines.
+\item
+  F1 snippet has six planted defects; students need five. F3 is
+  deterministic with the stated priority convention.
+\item
+  Part G ties the course together and takes ≈30 min; if time is tight,
+  drop G4's logger analysis (−2.5) and rescale.
+\end{itemize}
+
+\end{document}
